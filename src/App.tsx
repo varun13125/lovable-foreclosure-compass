@@ -12,6 +12,7 @@ import NewCase from "./pages/NewCase";
 import NotFound from "./pages/NotFound";
 import Cases from "./pages/Cases";
 import Documents from "./pages/Documents";
+import ViewDocument from "./pages/ViewDocument";
 import Messages from "./pages/Messages";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/case/:id" element={<CaseDetail />} />
           <Route path="/new-case" element={<NewCase />} />
           <Route path="/documents" element={<Documents />} />
+          <Route path="/document/:id" element={<ViewDocument />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/messages" element={<Messages />} />

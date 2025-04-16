@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -23,17 +22,20 @@ import {
   FileCheck,
   Download,
   Save,
-  Printer
+  Printer,
+  ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 import { Case, Party, Document } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface DocumentGeneratorProps {
   caseId?: string;
 }
 
 export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
+  const navigate = useNavigate();
   const [selectedCase, setSelectedCase] = useState<string | undefined>(caseId);
   const [documentType, setDocumentType] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -42,6 +44,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   const [cases, setCases] = useState<Case[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [templates, setTemplates] = useState<{id: number; name: string; description: string; content: string}[]>([]);
+  const [currentDocumentContent, setCurrentDocumentContent] = useState<string>("");
 
   // Fetch all cases and templates on component mount
   useEffect(() => {
@@ -287,7 +290,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
             postalCode: caseData.property.postal_code || ''
           },
           pid: caseData.property.pid || '',
-          legalDescription: caseData.property.legal_description || '',
+          legalDescription: caseData.property.legalDescription || '',
           propertyType: caseData.property.property_type
         },
         mortgage: {
@@ -329,6 +332,9 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
       const documentContent = selectedTemplate 
         ? generateDocumentContentFromTemplate(selectedTemplate.content, activeCaseData)
         : generateDocumentContent(documentType, activeCaseData);
+        
+      // Save current document content for preview
+      setCurrentDocumentContent(documentContent);
         
       const documentTitle = selectedTemplate 
         ? `${selectedTemplate.name} - ${activeCaseData?.fileNumber || "Unknown"}`
@@ -707,12 +713,20 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
   };
   
   const handlePrintDocument = (documentId: string) => {
-    // In a real app, this would generate a PDF and print it
-    toast.success("Printing document...");
-    
-    // For demo purposes, open a print dialog with the document content
     const documentToPrint = documents.find(doc => doc.id === documentId);
-    if (documentToPrint) {
+    if (!documentToPrint) {
+      toast.error("Document not found");
+      return;
+    }
+    
+    // Fetch document content if needed
+    fetchDocumentContent(documentId).then(content => {
+      if (!content) {
+        toast.error("Could not load document content");
+        return;
+      }
+      
+      // Open a new window with formatted content
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
@@ -738,7 +752,7 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
             </head>
             <body>
               <h1>${documentToPrint.title}</h1>
-              <pre>${documentToPrint.id}</pre>
+              <pre>${content}</pre>
               <script>
                 window.onload = function() {
                   window.print();
@@ -748,8 +762,69 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
           </html>
         `);
         printWindow.document.close();
+        toast.success("Print dialog opened");
+      } else {
+        toast.error("Could not open print window. Please check your popup blocker settings.");
       }
+    });
+  };
+  
+  const handleDownloadDocument = (documentId: string) => {
+    const documentToDownload = documents.find(doc => doc.id === documentId);
+    if (!documentToDownload) {
+      toast.error("Document not found");
+      return;
     }
+    
+    // Fetch document content if needed
+    fetchDocumentContent(documentId).then(content => {
+      if (!content) {
+        toast.error("Could not load document content");
+        return;
+      }
+      
+      // Create a Blob containing the document content
+      const blob = new Blob([content], { type: "text/plain" });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${documentToDownload.title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`${documentToDownload.title} downloaded successfully`);
+    });
+  };
+
+  const fetchDocumentContent = async (documentId: string): Promise<string> => {
+    try {
+      // If we're in preview mode and it's the current document, return the current content
+      if (previewMode && documents[0]?.id === documentId && currentDocumentContent) {
+        return currentDocumentContent;
+      }
+      
+      const { data, error } = await supabase
+        .from('documents')
+        .select('content')
+        .eq('id', documentId)
+        .single();
+        
+      if (error) throw error;
+      return data.content || "";
+    } catch (error) {
+      console.error("Error fetching document content:", error);
+      return "";
+    }
+  };
+  
+  const viewDocument = (documentId: string) => {
+    navigate(`/document/${documentId}`);
   };
 
   return (
@@ -832,12 +907,12 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                 
                 <div className="border rounded bg-muted/30 p-3 text-sm mb-3 max-h-60 overflow-y-auto">
                   <pre className="whitespace-pre-wrap font-sans">
-                    {documentType.startsWith('template-') 
+                    {currentDocumentContent || (documentType.startsWith('template-') 
                       ? generateDocumentContentFromTemplate(
                           templates.find(t => `template-${t.id}` === documentType)?.content || "",
                           activeCaseData
                         )
-                      : generateDocumentContent(documentType, activeCaseData)
+                      : generateDocumentContent(documentType, activeCaseData))
                     }
                   </pre>
                 </div>
@@ -869,6 +944,14 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                   >
                     <Printer className="h-4 w-4" />
                     Print
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={() => handleDownloadDocument(documents[0]?.id)}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
                   </Button>
                 </>
               ) : (
@@ -917,15 +1000,19 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                 documents.slice(0, 5).map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-2 rounded border hover:bg-muted/50"
+                    className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 cursor-pointer"
+                    onClick={() => viewDocument(doc.id)}
                   >
                     <div className="flex items-center gap-2">
                       <FileCheck className="h-4 w-4 text-law-teal" />
                       <span className="text-sm">{doc.title}</span>
                     </div>
-                    <Badge variant={doc.status === "Draft" ? "outline" : "default"}>
-                      {doc.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={doc.status === "Draft" ? "outline" : "default"}>
+                        {doc.status}
+                      </Badge>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
                   </div>
                 ))
               ) : (
