@@ -10,6 +10,7 @@ import Clients from "./pages/Clients";
 import CaseDetail from "./pages/CaseDetail";
 import NewCase from "./pages/NewCase";
 import NotFound from "./pages/NotFound";
+import Cases from "./pages/Cases";
 
 const queryClient = new QueryClient();
 
@@ -21,7 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/cases" element={<Index />} />
+          <Route path="/cases" element={<Cases />} />
           <Route path="/case/:id" element={<CaseDetail />} />
           <Route path="/new-case" element={<NewCase />} />
           <Route path="/documents" element={<Index />} />
