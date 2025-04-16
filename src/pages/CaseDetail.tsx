@@ -193,9 +193,16 @@ export default function CaseDetail() {
     if (!activeCase) return;
     
     try {
+      // Add timestamp to notes
+      const now = new Date();
+      const timestamp = now.toLocaleString();
+      const updatedNotes = notes.trim() ? 
+        `${notes}\n\n[${timestamp}] ` : 
+        `[${timestamp}] `;
+      
       const { error } = await supabase
         .from('cases')
-        .update({ notes: notes })
+        .update({ notes: updatedNotes })
         .eq('id', activeCase.id);
         
       if (error) throw error;
@@ -206,8 +213,10 @@ export default function CaseDetail() {
       // Update the local state
       setActiveCase({
         ...activeCase,
-        notes: notes
+        notes: updatedNotes
       });
+      
+      setNotes(updatedNotes);
     } catch (error) {
       console.error("Error updating notes:", error);
       toast.error("Failed to update notes");
@@ -282,7 +291,7 @@ export default function CaseDetail() {
               <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
             </div>
             <CaseForm 
-              caseData={activeCase}
+              existingCase={activeCase}
               onCancel={() => {
                 window.location.href = `/case/${id}`;
               }}
@@ -319,6 +328,16 @@ export default function CaseDetail() {
     });
   };
 
+  const handleGenerateDocuments = () => {
+    // Scroll to the documents tab and select it
+    const tabsElement = document.querySelector('[data-state="active"][role="tabpanel"]');
+    const documentsTab = document.querySelector('[data-value="documents"]');
+    
+    if (documentsTab) {
+      (documentsTab as HTMLButtonElement).click();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -352,7 +371,10 @@ export default function CaseDetail() {
                   Edit Case
                 </Link>
               </Button>
-              <Button className="gap-2 bg-law-teal hover:bg-law-teal/90">
+              <Button 
+                className="gap-2 bg-law-teal hover:bg-law-teal/90"
+                onClick={handleGenerateDocuments}
+              >
                 <FileText className="h-4 w-4" />
                 Generate Documents
               </Button>
@@ -580,7 +602,7 @@ export default function CaseDetail() {
                     />
                   ) : (
                     <div className="border rounded-lg p-4 min-h-[300px] whitespace-pre-wrap">
-                      {activeCase.notes || "No notes have been added to this case."}
+                      {activeCase.notes || "[No notes have been added yet]"}
                     </div>
                   )}
                 </CardContent>
