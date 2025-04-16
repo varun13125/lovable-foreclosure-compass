@@ -21,11 +21,13 @@ import {
   FilePlus, 
   ChevronRight,
   FileCheck,
-  Download
+  Download,
+  Save
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { mockCases } from "@/data/mockData";
-import { Case } from "@/types";
+import { Case, Party, Document } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DocumentGeneratorProps {
   caseId?: string;
@@ -36,13 +38,11 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   const [documentType, setDocumentType] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [previewMode, setPreviewMode] = useState<boolean>(false);
+  const [activeCaseData, setActiveCaseData] = useState<Case | undefined>(undefined);
+  const [cases, setCases] = useState<Case[]>(mockCases);
+  const [documents, setDocuments] = useState<Document[]>([]);
 
-  // Reset document type when case changes
-  useEffect(() => {
-    setDocumentType("");
-    setPreviewMode(false);
-  }, [selectedCase]);
-
+  // Template types for document generation
   const templateTypes = [
     {
       id: "demand",
@@ -71,11 +71,58 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     },
   ];
 
-  const activeCaseData: Case | undefined = selectedCase 
-    ? mockCases.find(c => c.id === selectedCase)
-    : undefined;
+  // Reset document type when case changes
+  useEffect(() => {
+    setDocumentType("");
+    setPreviewMode(false);
+    
+    if (selectedCase) {
+      // Fetch case data when selected
+      fetchCaseData(selectedCase);
+    }
+  }, [selectedCase]);
+  
+  // Fetch real case data from Supabase
+  const fetchCaseData = async (caseId: string) => {
+    try {
+      // Use mock data for now, would replace with real data fetch
+      const caseData = cases.find(c => c.id === caseId);
+      setActiveCaseData(caseData);
+      
+      // Fetch documents for the selected case
+      if (caseId) {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('case_id', caseId)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        
+        // Transform to match Document type
+        const transformedDocs: Document[] = data.map(doc => ({
+          id: doc.id,
+          title: doc.title,
+          type: doc.type,
+          createdAt: doc.created_at,
+          status: doc.status,
+          caseId: doc.case_id,
+          url: doc.url || undefined
+        }));
+        
+        setDocuments(transformedDocs);
+      }
+    } catch (error) {
+      console.error("Error fetching case data:", error);
+      toast({
+        title: "Error",
+        description: "Could not load case data",
+        variant: "destructive"
+      });
+    }
+  };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedCase || !documentType) {
       toast({
         title: "Missing Information",
@@ -87,16 +134,68 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
 
     setIsGenerating(true);
     
-    // Simulate document generation with timeout
-    setTimeout(() => {
+    try {
+      // In a real app, we would generate the document content here
+      // For now, simulate document generation with timeout
+      setTimeout(async () => {
+        // Create a new document record in the database
+        const documentTitle = `${getDocumentTypeName(documentType)} - ${activeCaseData?.fileNumber || "Unknown"}`;
+        
+        const { data: docData, error } = await supabase
+          .from('documents')
+          .insert({
+            title: documentTitle,
+            type: mapDocumentTypeToEnum(documentType),
+            case_id: selectedCase,
+            status: "Draft",
+            content: generateDocumentContent(documentType, activeCaseData)
+          })
+          .select('*')
+          .single();
+          
+        if (error) throw error;
+        
+        // Add the new document to the list
+        const newDoc: Document = {
+          id: docData.id,
+          title: docData.title,
+          type: docData.type,
+          createdAt: docData.created_at,
+          status: docData.status,
+          caseId: docData.case_id,
+          url: docData.url || undefined
+        };
+        
+        setDocuments(prev => [newDoc, ...prev]);
+        setIsGenerating(false);
+        setPreviewMode(true);
+        
+        toast({
+          title: "Document Generated",
+          description: `${documentTitle} created successfully.`,
+        });
+      }, 1500);
+    } catch (error) {
+      console.error("Error generating document:", error);
       setIsGenerating(false);
-      setPreviewMode(true);
-      
       toast({
-        title: "Document Generated",
-        description: `${getDocumentTypeName(documentType)} created successfully.`,
+        title: "Error",
+        description: "Failed to generate document",
+        variant: "destructive"
       });
-    }, 1500);
+    }
+  };
+
+  // Map our internal document type IDs to the enum values expected by the database
+  const mapDocumentTypeToEnum = (docType: string): Document['type'] => {
+    switch (docType) {
+      case "demand": return "Demand Letter";
+      case "payout": return "Other";
+      case "petition": return "Petition";
+      case "ordernisi": return "Order Nisi";
+      case "conduct": return "Conduct of Sale";
+      default: return "Other";
+    }
   };
 
   const getDocumentTypeName = (typeId: string): string => {
@@ -117,6 +216,114 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
         return <FileText className="h-5 w-5 text-amber-500" />;
       default:
         return <FileText className="h-5 w-5" />;
+    }
+  };
+  
+  // Generate document content based on template and case data
+  const generateDocumentContent = (docType: string, caseData?: Case): string => {
+    if (!caseData) return "";
+    
+    const borrower = caseData.parties.find(p => p.type === "Borrower");
+    const lender = caseData.parties.find(p => p.type === "Lender");
+    
+    switch (docType) {
+      case "demand":
+        return `WITHOUT PREJUDICE
+
+RE: DEMAND FOR PAYMENT
+
+Property: ${caseData.property.address.street}, ${caseData.property.address.city}
+Mortgage: ${caseData.mortgage.registrationNumber}
+Balance Due: $${caseData.mortgage.currentBalance.toLocaleString()}
+
+Dear ${borrower?.name},
+
+Please be advised that we represent ${lender?.name} in connection with the above-noted mortgage. Our client advises that you are in default of your payment obligations under the mortgage.
+
+As of ${new Date().toLocaleDateString()}, the following amounts are due and owing:
+
+Principal Balance: $${caseData.mortgage.currentBalance.toLocaleString()}
+Arrears: $${caseData.mortgage.arrears?.toLocaleString() || "0.00"}
+Per Diem Interest: $${caseData.mortgage.perDiemInterest.toLocaleString()}/day
+
+DEMAND IS HEREBY MADE for payment of the full amount due and owing within 10 days of the date of this letter, failing which our client may commence foreclosure proceedings without further notice to you.
+
+Yours truly,`;
+
+      case "petition":
+        return `No. ${caseData.court?.fileNumber || "[Court File Number]"}
+${caseData.court?.registry || "Vancouver"} Registry
+
+IN THE SUPREME COURT OF BRITISH COLUMBIA
+
+BETWEEN:
+${lender?.name}
+PETITIONER
+
+AND:
+${borrower?.name}
+RESPONDENT
+
+PETITION TO THE COURT
+
+ON NOTICE TO:
+${borrower?.name}, of ${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province}
+
+This proceeding is brought for the foreclosure of a mortgage.
+
+[...]`;
+      
+      case "payout":
+        return `MORTGAGE PAYOUT STATEMENT
+
+Property: ${caseData.property.address.street}
+Mortgagor: ${borrower?.name}
+Principal Balance: $${caseData.mortgage.currentBalance.toLocaleString()}
+Per Diem Interest: $${caseData.mortgage.perDiemInterest.toLocaleString()}/day
+
+[...]`;
+        
+      case "ordernisi":
+        return `ORDER NISI OF FORECLOSURE
+
+No. ${caseData.court?.fileNumber || "[Court File Number]"}
+${caseData.court?.registry || "Vancouver"} Registry
+
+BEFORE THE HONOURABLE
+JUSTICE [NAME]
+)
+)
+) [DATE]
+
+BETWEEN:
+${lender?.name}
+PETITIONER
+
+AND:
+${borrower?.name}
+RESPONDENT
+
+[...]
+REDEMPTION PERIOD: 6 MONTHS`;
+      
+      case "conduct":
+        return `APPLICATION FOR CONDUCT OF SALE
+
+No. ${caseData.court?.fileNumber || "[Court File Number]"}
+${caseData.court?.registry || "Vancouver"} Registry
+
+BETWEEN:
+${lender?.name}
+PETITIONER
+
+AND:
+${borrower?.name}
+RESPONDENT
+
+[...]`;
+      
+      default:
+        return "";
     }
   };
 
@@ -140,7 +347,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
                   <SelectValue placeholder="Select a case" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockCases.map((caseItem) => (
+                  {cases.map((caseItem) => (
                     <SelectItem key={caseItem.id} value={caseItem.id}>
                       {caseItem.fileNumber} - {caseItem.property.address.street}
                     </SelectItem>
@@ -183,57 +390,10 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
                   </span>
                 </div>
                 
-                <div className="border rounded bg-muted/30 p-3 text-sm mb-3">
-                  {documentType === "demand" && (
-                    <div className="space-y-2">
-                      <p>WITHOUT PREJUDICE</p>
-                      <p className="font-semibold">RE: DEMAND FOR PAYMENT</p>
-                      <p>Property: {activeCaseData.property.address.street}, {activeCaseData.property.address.city}</p>
-                      <p>Mortgage: {activeCaseData.mortgage.registrationNumber}</p>
-                      <p>Balance Due: ${activeCaseData.mortgage.currentBalance.toLocaleString()}</p>
-                      
-                      <p>Dear {activeCaseData.parties.find(p => p.type === "Borrower")?.name},</p>
-                      
-                      <p>Please be advised that we represent {activeCaseData.parties.find(p => p.type === "Lender")?.name} in connection with the above-noted mortgage...</p>
-                      
-                      <p className="text-muted-foreground">[Preview truncated]</p>
-                    </div>
-                  )}
-                  
-                  {documentType === "payout" && (
-                    <div className="space-y-2">
-                      <p className="font-semibold text-center">MORTGAGE PAYOUT STATEMENT</p>
-                      <p>Property: {activeCaseData.property.address.street}</p>
-                      <p>Mortgagor: {activeCaseData.parties.find(p => p.type === "Borrower")?.name}</p>
-                      <p>Principal Balance: ${activeCaseData.mortgage.currentBalance.toLocaleString()}</p>
-                      <p>Per Diem Interest: ${activeCaseData.mortgage.perDiemInterest.toLocaleString()}/day</p>
-                      
-                      <p className="text-muted-foreground">[Preview truncated]</p>
-                    </div>
-                  )}
-                  
-                  {(documentType === "petition" || documentType === "ordernisi" || documentType === "conduct") && (
-                    <div className="space-y-2">
-                      <p className="font-semibold text-center">
-                        {documentType === "petition" ? "PETITION TO THE COURT" : 
-                         documentType === "ordernisi" ? "ORDER NISI" : 
-                         "APPLICATION FOR CONDUCT OF SALE"}
-                      </p>
-                      <p>No. {activeCaseData.court?.fileNumber || "[Court File Number]"}</p>
-                      <p>{activeCaseData.court?.registry || "Vancouver"} Registry</p>
-                      <p>IN THE SUPREME COURT OF BRITISH COLUMBIA</p>
-                      
-                      <p>BETWEEN:</p>
-                      <p className="font-semibold">{activeCaseData.parties.find(p => p.type === "Lender")?.name}</p>
-                      <p>PETITIONER</p>
-                      
-                      <p>AND:</p>
-                      <p className="font-semibold">{activeCaseData.parties.find(p => p.type === "Borrower")?.name}</p>
-                      <p>RESPONDENT</p>
-                      
-                      <p className="text-muted-foreground">[Preview truncated]</p>
-                    </div>
-                  )}
+                <div className="border rounded bg-muted/30 p-3 text-sm mb-3 max-h-60 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap font-sans">
+                    {generateDocumentContent(documentType, activeCaseData)}
+                  </pre>
                 </div>
               </div>
             ) : (
@@ -290,25 +450,20 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
           <div className="mt-2">
             <h3 className="text-sm font-medium mb-2">Recent Documents</h3>
             <div className="space-y-2">
-              {(selectedCase ? 
-                mockCases.find(c => c.id === selectedCase)?.documents : 
-                mockCases[0]?.documents)?.length > 0 ? (
-                  (selectedCase ? 
-                    mockCases.find(c => c.id === selectedCase)?.documents : 
-                    mockCases[0]?.documents
-                  )?.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-2 rounded border"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileCheck className="h-4 w-4 text-law-teal" />
-                        <span className="text-sm">{doc.title}</span>
-                      </div>
-                      <Badge variant="outline">{doc.status}</Badge>
+              {documents && documents.length > 0 ? (
+                documents.slice(0, 5).map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-2 rounded border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileCheck className="h-4 w-4 text-law-teal" />
+                      <span className="text-sm">{doc.title}</span>
                     </div>
-                  ))
-                ) : (
+                    <Badge variant="outline">{doc.status}</Badge>
+                  </div>
+                ))
+              ) : (
                 <div className="p-2 text-sm text-muted-foreground">
                   No recent documents
                 </div>

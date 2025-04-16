@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, Plus, MoreHorizontal, Eye, FileEdit, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +21,75 @@ import {
 
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
-import { mockCases } from "@/data/mockData";
+import ClientForm from "@/components/Clients/ClientForm";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { Party } from "@/types";
 
 export default function Clients() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [clients, setClients] = useState<Party[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [partyFilter, setPartyFilter] = useState<string>("All");
+  const navigate = useNavigate();
+  const { toast } = useToast();
   
-  // Extract all clients and borrowers from all cases
+  // Load clients from supabase
+  const fetchClients = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('parties')
+        .select('*');
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Transform database structure to match Party interface
+      const transformedParties: Party[] = data.map(party => ({
+        id: party.id,
+        name: party.name,
+        type: party.type,
+        contactInfo: {
+          email: party.email || '',
+          phone: party.phone || '',
+          address: party.address || '',
+        }
+      }));
+      
+      setClients(transformedParties);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      toast({
+        title: "Error loading clients",
+        description: "There was a problem loading the client list.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    fetchClients();
+  }, []);
+  
+  // Count number of cases per client
+  const clientCaseCounts: Record<string, number> = {};
+  
+  // Filter clients based on search query and party type filter
+  const filteredClients = clients.filter(client =>
+    (partyFilter === "All" || client.type === partyFilter) &&
+    (searchQuery === "" ||
+    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.contactInfo.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (client.contactInfo.address && client.contactInfo.address.toLowerCase().includes(searchQuery.toLowerCase())))
+  );
+  
+  // Group clients by type for stats
   const partiesByType: Record<string, Party[]> = {
     Client: [],
     Borrower: [],
@@ -36,42 +98,11 @@ export default function Clients() {
     Lawyer: []
   };
   
-  mockCases.forEach(c => {
-    if (c.parties && c.parties.length > 0) {
-      c.parties.forEach(p => {
-        if (partiesByType[p.type]) {
-          // Check if this party is already in the array
-          const existingParty = partiesByType[p.type].find(existing => existing.id === p.id);
-          if (!existingParty) {
-            partiesByType[p.type].push({...p});
-          }
-        }
-      });
+  clients.forEach(party => {
+    if (partiesByType[party.type]) {
+      partiesByType[party.type].push(party);
     }
   });
-  
-  // Count number of cases per client
-  const clientCaseCounts: Record<string, number> = {};
-  mockCases.forEach(c => {
-    c.parties.forEach(p => {
-      if (p.type === "Client" || p.type === "Borrower") {
-        if (!clientCaseCounts[p.id]) {
-          clientCaseCounts[p.id] = 1;
-        } else {
-          clientCaseCounts[p.id]++;
-        }
-      }
-    });
-  });
-  
-  // Filter clients based on search query
-  const filteredClients = [...partiesByType.Client, ...partiesByType.Borrower]
-    .filter(client =>
-      searchQuery === "" ||
-      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.contactInfo.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.contactInfo.address && client.contactInfo.address.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,7 +116,10 @@ export default function Clients() {
               <p className="text-muted-foreground">Manage clients and borrowers</p>
             </div>
             <div className="mt-4 md:mt-0">
-              <Button className="bg-law-teal hover:bg-law-teal/90">
+              <Button 
+                className="bg-law-teal hover:bg-law-teal/90"
+                onClick={() => setIsAddClientOpen(true)}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Add New Client
               </Button>
@@ -111,13 +145,14 @@ export default function Clients() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="gap-2">
                       <Filter className="h-4 w-4" />
-                      All Types
+                      {partyFilter}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem>All Types</DropdownMenuItem>
-                    <DropdownMenuItem>Clients Only</DropdownMenuItem>
-                    <DropdownMenuItem>Borrowers Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPartyFilter("All")}>All Types</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPartyFilter("Client")}>Clients Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPartyFilter("Borrower")}>Borrowers Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPartyFilter("Lender")}>Lenders Only</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -134,7 +169,13 @@ export default function Clients() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredClients.length === 0 ? (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center h-32 text-muted-foreground">
+                          Loading clients...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredClients.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center h-32 text-muted-foreground">
                           No clients match your search
@@ -150,13 +191,13 @@ export default function Clients() {
                               <div className="flex items-center gap-1">
                                 <Mail className="h-3 w-3 text-muted-foreground" />
                                 <a href={`mailto:${client.contactInfo.email}`} className="text-sm hover:underline">
-                                  {client.contactInfo.email}
+                                  {client.contactInfo.email || 'No email'}
                                 </a>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Phone className="h-3 w-3 text-muted-foreground" />
                                 <a href={`tel:${client.contactInfo.phone}`} className="text-sm hover:underline">
-                                  {client.contactInfo.phone}
+                                  {client.contactInfo.phone || 'No phone'}
                                 </a>
                               </div>
                             </div>
@@ -238,25 +279,38 @@ export default function Clients() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockCases[0].documents.slice(0, 3).map((doc, index) => (
-                    <div key={index} className="p-3 border rounded-md">
-                      <div className="flex justify-between">
-                        <div className="font-medium">Document Generated</div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(doc.createdAt).toLocaleDateString()}
+                  {clients.length > 0 ? (
+                    clients.slice(0, 3).map((client, index) => (
+                      <div key={index} className="p-3 border rounded-md">
+                        <div className="flex justify-between">
+                          <div className="font-medium">Client Added</div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date().toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {client.name} ({client.type})
                         </div>
                       </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {doc.title} for {mockCases[0].parties.find(p => p.type === "Borrower")?.name}
-                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 border rounded-md text-center text-muted-foreground">
+                      No recent activity
                     </div>
-                  ))}
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
         </main>
       </div>
+      
+      {/* Add Client Dialog */}
+      <ClientForm 
+        open={isAddClientOpen}
+        onClose={() => setIsAddClientOpen(false)}
+        onSuccess={() => fetchClients()}
+      />
     </div>
   );
 }

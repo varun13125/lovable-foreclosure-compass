@@ -4,13 +4,21 @@ import { useNavigate } from "react-router-dom";
 import CaseForm from "@/components/Cases/CaseForm";
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function NewCase() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleCancel = () => {
     navigate('/cases');
+  };
+
+  const handleError = (errorMessage: string) => {
+    setError(errorMessage);
+    setLoading(false);
   };
 
   return (
@@ -25,6 +33,17 @@ export default function NewCase() {
               <p className="text-muted-foreground">Enter details for the new foreclosure case</p>
             </div>
           </div>
+          
+          {error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <CaseForm onCancel={handleCancel} />
         </main>
       </div>
