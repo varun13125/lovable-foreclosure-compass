@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Plus, MoreHorizontal, Eye, FileEdit } from "lucide-react";
 import { getStatusColor } from "@/data/mockData";
 import { Case } from "@/types";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 export default function CaseList() {
   const [cases, setCases] = useState<Case[]>([]);
@@ -51,7 +51,8 @@ export default function CaseList() {
             address: street,
             city,
             province,
-            postal_code
+            postal_code,
+            property_type
           ),
           parties: case_parties (
             party: parties (
@@ -66,7 +67,8 @@ export default function CaseList() {
             principal,
             interest_rate,
             start_date,
-            current_balance
+            current_balance,
+            per_diem_interest
           )
         `)
         .order('created_at', { ascending: false });
@@ -74,7 +76,7 @@ export default function CaseList() {
       if (error) throw error;
 
       // Transform the data to match the Case type
-      const transformedCases = data.map(caseItem => ({
+      const transformedCases: Case[] = data.map(caseItem => ({
         id: caseItem.id,
         fileNumber: caseItem.file_number,
         status: caseItem.status,
@@ -90,7 +92,7 @@ export default function CaseList() {
           },
           pid: '',
           legalDescription: '',
-          propertyType: 'Residential'
+          propertyType: caseItem.property.property_type || 'Residential'
         },
         parties: caseItem.parties.map(cp => ({
           id: cp.party.id,
@@ -108,7 +110,7 @@ export default function CaseList() {
           interestRate: caseItem.mortgage.interest_rate,
           startDate: caseItem.mortgage.start_date,
           currentBalance: caseItem.mortgage.current_balance,
-          perDiemInterest: 0
+          perDiemInterest: caseItem.mortgage.per_diem_interest || 0
         },
         deadlines: [],
         documents: []
@@ -289,3 +291,4 @@ export default function CaseList() {
     </Card>
   );
 }
+
