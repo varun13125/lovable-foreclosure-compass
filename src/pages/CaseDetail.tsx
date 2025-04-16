@@ -23,7 +23,7 @@ import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import DocumentGenerator from "@/components/Documents/DocumentGenerator";
 import { getStatusColor } from "@/data/mockData";
-import { Case, Deadline, Party } from "@/types";
+import { Case, CaseStatus, Deadline, Party } from "@/types";
 import CaseTimeline from "@/components/Cases/CaseTimeline";
 import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
@@ -198,7 +198,7 @@ export default function CaseDetail() {
     }
   };
 
-  const handleStatusUpdated = (newStatus: string) => {
+  const handleStatusUpdated = (newStatus: CaseStatus) => {
     if (activeCase) {
       setActiveCase({
         ...activeCase,

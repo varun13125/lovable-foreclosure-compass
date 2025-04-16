@@ -9,11 +9,12 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { CaseStatus } from "@/types";
 
 interface CaseStatusUpdateProps {
   caseId: string;
-  currentStatus: string;
-  onStatusUpdated: (newStatus: string) => void;
+  currentStatus: CaseStatus;
+  onStatusUpdated: (newStatus: CaseStatus) => void;
 }
 
 export default function CaseStatusUpdate({ 
@@ -23,21 +24,18 @@ export default function CaseStatusUpdate({
 }: CaseStatusUpdateProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const statuses = [
-    "New",
-    "Demand Sent",
-    "In Default",
-    "Legal Action",
-    "Petition Filed",
-    "Order Nisi",
-    "Redemption Period",
-    "Conduct of Sale",
-    "Sold",
-    "Completed",
-    "On Hold"
+  // Make sure these statuses match the CaseStatus type in src/types/index.ts
+  const statuses: CaseStatus[] = [
+    'New',
+    'Demand Letter Sent',
+    'Petition Filed',
+    'Order Nisi Granted',
+    'Redemption Period',
+    'Sale Process',
+    'Closed'
   ];
   
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: CaseStatus) => {
     if (newStatus === currentStatus) return;
     
     setIsUpdating(true);
