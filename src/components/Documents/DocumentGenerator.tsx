@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -920,4 +921,22 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                   >
                     <div className="flex items-center gap-2">
                       <FileCheck className="h-4 w-4 text-law-teal" />
-                      <span className="text-sm">{doc.
+                      <span className="text-sm">{doc.title}</span>
+                    </div>
+                    <Badge variant={doc.status === "Draft" ? "outline" : "default"}>
+                      {doc.status}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground p-3 border rounded-md text-center">
+                  No documents found
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
