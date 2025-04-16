@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import TemplateDialog from "./TemplateDialog";
@@ -13,30 +13,47 @@ interface Template {
 }
 
 export default function DocumentTemplates() {
-  const [templates, setTemplates] = useState<Template[]>([
-    {
-      id: 1,
-      name: "Demand Letter",
-      description: "Default template for initial demands",
-      content: "This is a sample demand letter template content."
-    },
-    {
-      id: 2,
-      name: "Petition",
-      description: "Standard foreclosure petition",
-      content: "This is a sample petition template content."
-    },
-    {
-      id: 3,
-      name: "Order Nisi",
-      description: "Court order template",
-      content: "This is a sample court order template content."
-    }
-  ]);
-  
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  
+  // Load templates from local storage on component mount
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('document_templates');
+    if (savedTemplates) {
+      setTemplates(JSON.parse(savedTemplates));
+    } else {
+      // Default templates if none exist
+      const defaultTemplates = [
+        {
+          id: 1,
+          name: "Demand Letter",
+          description: "Default template for initial demands",
+          content: "WITHOUT PREJUDICE\n\nDATE: {date}\n\nRE: DEMAND FOR PAYMENT\n\nProperty: {property.address}\nMortgage Registration: {mortgage.number}\nBalance Due: {mortgage.balance}\n\nDear {borrower.name},\n\nPlease be advised that we represent {lender.name} in connection with the above-noted mortgage. Our client advises that you are in default of your payment obligations under the mortgage.\n\nAs of {date}, the following amounts are due and owing:\n\nPrincipal Balance: {mortgage.balance}\nArrears: {mortgage.arrears}\nPer Diem Interest: {mortgage.per_diem}/day\n\nDEMAND IS HEREBY MADE for payment of the full amount due and owing within 10 days of the date of this letter, failing which our client may commence foreclosure proceedings without further notice to you.\n\nYours truly,"
+        },
+        {
+          id: 2,
+          name: "Petition",
+          description: "Standard foreclosure petition",
+          content: "No. {court.file_number}\n{court.registry} Registry\n\nIN THE SUPREME COURT OF BRITISH COLUMBIA\n\nBETWEEN:\n{lender.name}\nPETITIONER\n\nAND:\n{borrower.name}\nRESPONDENT"
+        },
+        {
+          id: 3,
+          name: "Order Nisi",
+          description: "Court order template",
+          content: "ORDER NISI OF FORECLOSURE\n\nNo. {court.file_number}\n{court.registry} Registry\n\nBEFORE THE HONOURABLE\nJUSTICE {court.judge_name}\n)\n)\n) {court.hearing_date}\n\nBETWEEN:\n{lender.name}\nPETITIONER\n\nAND:\n{borrower.name}\nRESPONDENT\n\nORDER"
+        }
+      ];
+      setTemplates(defaultTemplates);
+      localStorage.setItem('document_templates', JSON.stringify(defaultTemplates));
+    }
+  }, []);
+  
+  // Save templates to local storage whenever they change
+  useEffect(() => {
+    localStorage.setItem('document_templates', JSON.stringify(templates));
+  }, [templates]);
   
   const handleAddTemplate = (templateData: {name: string; description: string; content: string}) => {
     if (!templateData.name) {
@@ -46,7 +63,7 @@ export default function DocumentTemplates() {
     
     const newId = templates.length ? Math.max(...templates.map(t => t.id)) + 1 : 1;
     
-    setTemplates([
+    const newTemplates = [
       ...templates,
       {
         id: newId,
@@ -54,7 +71,10 @@ export default function DocumentTemplates() {
         description: templateData.description,
         content: templateData.content
       }
-    ]);
+    ];
+    
+    setTemplates(newTemplates);
+    localStorage.setItem('document_templates', JSON.stringify(newTemplates));
     
     setOpenAddDialog(false);
     toast.success("Template added successfully");
@@ -72,11 +92,15 @@ export default function DocumentTemplates() {
     }
 
     if (id) {
-      setTemplates(templates.map(t => 
+      const updatedTemplates = templates.map(t => 
         t.id === id ? {...templateData, id} : t
-      ));
+      );
+      
+      setTemplates(updatedTemplates);
+      localStorage.setItem('document_templates', JSON.stringify(updatedTemplates));
       
       setOpenEditDialog(false);
+      setEditingTemplate(null);
       toast.success("Template updated successfully");
     }
   };

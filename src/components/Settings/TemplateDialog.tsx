@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -40,6 +40,17 @@ export default function TemplateDialog({
     description: template?.description || "",
     content: template?.content || ""
   });
+  
+  // Update form when template prop changes
+  useEffect(() => {
+    if (template) {
+      setTemplateData({
+        name: template.name,
+        description: template.description,
+        content: template.content
+      });
+    }
+  }, [template]);
 
   const handleSave = () => {
     if (isEditing && template) {
@@ -48,11 +59,14 @@ export default function TemplateDialog({
       onSave(templateData);
     }
     
-    setTemplateData({
-      name: "",
-      description: "",
-      content: ""
-    });
+    if (!isEditing) {
+      // Only reset on new templates, not when editing
+      setTemplateData({
+        name: "",
+        description: "",
+        content: ""
+      });
+    }
   };
 
   return (
@@ -93,6 +107,9 @@ export default function TemplateDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="template-content">Template Content</Label>
+            <div className="mb-1 text-xs text-muted-foreground">
+              Use variables like {'{property.address}'}, {'{borrower.name}'}, {'{mortgage.balance}'} to auto-fill data
+            </div>
             <Textarea
               id="template-content"
               rows={8}

@@ -16,9 +16,10 @@ export interface CaseFormProps {
   onError: (errorMessage: string) => void;
 }
 
-const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, onError }) => {
-  const [fileNumber, setFileNumber] = useState(initialData?.fileNumber || '');
-  const [notes, setNotes] = useState(initialData?.notes || '');
+const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, onSuccess, onError }) => {
+  const data = initialData || caseData; // Use either initialData or caseData props (for backward compatibility)
+  const [fileNumber, setFileNumber] = useState(data?.fileNumber || '');
+  const [notes, setNotes] = useState(data?.notes || '');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,22 +33,22 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
     }
 
     try {
-      if (initialData?.id) {
+      if (data?.id) {
         // Update existing case
-        const { data, error } = await supabase
+        const { data: updatedData, error } = await supabase
           .from('cases')
           .update({ 
             file_number: fileNumber, 
             notes: notes,
             // Handle mortgage_id and property_id differently to fix type errors
-            mortgage_id: typeof initialData.mortgage === 'string' 
-              ? initialData.mortgage 
-              : initialData.mortgage?.id || '00000000-0000-0000-0000-000000000000',
-            property_id: typeof initialData.property === 'string'
-              ? initialData.property
-              : initialData.property?.id || '00000000-0000-0000-0000-000000000000'
+            mortgage_id: typeof data.mortgage === 'string' 
+              ? data.mortgage 
+              : data.mortgage?.id || '00000000-0000-0000-0000-000000000000',
+            property_id: typeof data.property === 'string'
+              ? data.property
+              : data.property?.id || '00000000-0000-0000-0000-000000000000'
           })
-          .eq('id', initialData.id)
+          .eq('id', data.id)
           .select()
           .single();
 
@@ -57,11 +58,11 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
           toast.error("Failed to update case.");
         } else {
           toast.success("Case updated successfully!");
-          onSuccess(initialData.id);
+          onSuccess(data.id);
         }
       } else {
         // Create new case with mock data for required fields
-        const { data, error } = await supabase
+        const { data: newData, error } = await supabase
           .from('cases')
           .insert([{ 
             file_number: fileNumber, 
@@ -79,7 +80,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
           toast.error("Failed to create case.");
         } else {
           toast.success("Case created successfully!");
-          onSuccess(data.id);
+          onSuccess(newData.id);
         }
       }
     } catch (error) {

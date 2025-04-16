@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { 
@@ -30,6 +29,7 @@ import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
 import CaseParties from "@/components/Cases/CaseParties";
 import CaseForm from "@/components/Cases/CaseForm";
+import CaseStatusUpdate from "@/components/Cases/CaseStatusUpdate";
 import { supabase } from "@/integrations/supabase/client";
 import AddDeadlineDialog from "@/components/Cases/AddDeadlineDialog";
 import AddPartyDialog from "@/components/Cases/AddPartyDialog";
@@ -44,6 +44,7 @@ export default function CaseDetail() {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [addDeadlineOpen, setAddDeadlineOpen] = useState(false);
   const [addPartyOpen, setAddPartyOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   
   // For financials section visibility
   const [financeLoading, setFinanceLoading] = useState(false);
@@ -53,6 +54,14 @@ export default function CaseDetail() {
       fetchCase(id);
     }
   }, [id]);
+  
+  // Handle tab changes from URL
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   const fetchCase = async (caseId: string) => {
     try {
@@ -189,20 +198,30 @@ export default function CaseDetail() {
     }
   };
 
+  const handleStatusUpdated = (newStatus: string) => {
+    if (activeCase) {
+      setActiveCase({
+        ...activeCase,
+        status: newStatus
+      });
+    }
+  };
+
   const saveNotes = async () => {
     if (!activeCase) return;
     
     try {
-      // Add timestamp to notes
+      // Add timestamp and user to notes
       const now = new Date();
       const timestamp = now.toLocaleString();
+      const userName = "Current User"; // In a real app, get this from auth context
       let updatedNotes = "";
       
-      // Format: [timestamp] User note
+      // Format: [timestamp - userName] Note content
       if (notes.trim()) {
         updatedNotes = activeCase.notes 
-          ? `${activeCase.notes}\n\n[${timestamp}] ${notes.trim()}`
-          : `[${timestamp}] ${notes.trim()}`;
+          ? `${activeCase.notes}\n\n[${timestamp} - ${userName}] ${notes.trim()}`
+          : `[${timestamp} - ${userName}] ${notes.trim()}`;
       } else {
         // If note is empty, don't add anything
         updatedNotes = activeCase.notes || '';
@@ -229,6 +248,18 @@ export default function CaseDetail() {
       console.error("Error updating notes:", error);
       toast.error("Failed to update notes");
     }
+  };
+
+  const handleGenerateDocuments = () => {
+    setActiveTab("documents");
+    
+    // Use setTimeout to ensure the tab change has taken effect
+    setTimeout(() => {
+      const documentsTabPanel = document.querySelector('[data-value="documents"][role="tabpanel"]');
+      if (documentsTabPanel) {
+        documentsTabPanel.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   if (loading) {
@@ -281,7 +312,6 @@ export default function CaseDetail() {
     );
   }
 
-  // If in edit mode, render the CaseForm
   if (isEditMode) {
     return (
       <div className="min-h-screen bg-background">
@@ -299,7 +329,7 @@ export default function CaseDetail() {
               <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
             </div>
             <CaseForm 
-              caseData={activeCase}
+              initialData={activeCase}
               onCancel={() => {
                 window.location.href = `/case/${id}`;
               }}
@@ -336,16 +366,6 @@ export default function CaseDetail() {
     });
   };
 
-  const handleGenerateDocuments = () => {
-    // Scroll to the documents tab and select it
-    const tabsElement = document.querySelector('[data-state="active"][role="tabpanel"]');
-    const documentsTab = document.querySelector('[data-value="documents"]');
-    
-    if (documentsTab) {
-      (documentsTab as HTMLButtonElement).click();
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -363,9 +383,16 @@ export default function CaseDetail() {
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold">{activeCase.fileNumber}</h1>
-                  <Badge className={`${getStatusColor(activeCase.status)} hover:bg-opacity-80`}>
-                    {activeCase.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${getStatusColor(activeCase.status)} hover:bg-opacity-80`}>
+                      {activeCase.status}
+                    </Badge>
+                    <CaseStatusUpdate 
+                      caseId={activeCase.id} 
+                      currentStatus={activeCase.status} 
+                      onStatusUpdated={handleStatusUpdated} 
+                    />
+                  </div>
                 </div>
                 <p className="text-muted-foreground">
                   {activeCase.property.address.street}, {activeCase.property.address.city}, {activeCase.property.address.province}
@@ -501,7 +528,7 @@ export default function CaseDetail() {
             </Card>
           </div>
 
-          <Tabs defaultValue="overview" className="mt-6">
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="parties">Parties</TabsTrigger>

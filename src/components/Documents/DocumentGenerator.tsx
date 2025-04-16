@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -26,7 +25,6 @@ import {
   Printer
 } from "lucide-react";
 import { toast } from "sonner";
-import { mockCases } from "@/data/mockData";
 import { Case, Party, Document } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -42,39 +40,12 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   const [activeCaseData, setActiveCaseData] = useState<Case | undefined>(undefined);
   const [cases, setCases] = useState<Case[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [templates, setTemplates] = useState<{id: number; name: string; description: string; content: string}[]>([]);
 
-  // Template types for document generation
-  const templateTypes = [
-    {
-      id: "demand",
-      name: "Demand Letter",
-      description: "Default demand letter with 10-day notice period",
-    },
-    {
-      id: "payout",
-      name: "Payout Statement",
-      description: "Statement of mortgage payout with per diem interest",
-    },
-    {
-      id: "petition",
-      name: "Petition Package",
-      description: "Complete foreclosure petition with supporting documents",
-    },
-    {
-      id: "ordernisi",
-      name: "Order Nisi",
-      description: "Order Nisi with redemption period",
-    },
-    {
-      id: "conduct",
-      name: "Conduct of Sale",
-      description: "Application for conduct of sale",
-    },
-  ];
-
-  // Fetch all cases on component mount
+  // Fetch all cases and templates on component mount
   useEffect(() => {
     fetchAllCases();
+    fetchTemplates();
   }, []);
 
   // Reset document type when case changes
@@ -88,6 +59,43 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     }
   }, [selectedCase]);
   
+  // Fetch templates from database or local storage
+  const fetchTemplates = async () => {
+    try {
+      // First check if we have templates in local storage
+      const savedTemplates = localStorage.getItem('document_templates');
+      if (savedTemplates) {
+        setTemplates(JSON.parse(savedTemplates));
+      } else {
+        // Default templates if nothing in storage
+        const defaultTemplates = [
+          {
+            id: 1,
+            name: "Demand Letter",
+            description: "Default template for initial demands",
+            content: "This is a sample demand letter template content."
+          },
+          {
+            id: 2,
+            name: "Petition",
+            description: "Standard foreclosure petition",
+            content: "This is a sample petition template content."
+          },
+          {
+            id: 3,
+            name: "Order Nisi",
+            description: "Court order template",
+            content: "This is a sample court order template content."
+          }
+        ];
+        setTemplates(defaultTemplates);
+      }
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      toast.error("Could not load document templates");
+    }
+  };
+
   // Fetch all cases from database
   const fetchAllCases = async () => {
     try {
@@ -313,16 +321,24 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     setIsGenerating(true);
     
     try {
+      // Find the selected template
+      const selectedTemplate = templates.find(t => `template-${t.id}` === documentType);
+      
       // Generate document content based on template and case data
-      const documentContent = generateDocumentContent(documentType, activeCaseData);
-      const documentTitle = `${getDocumentTypeName(documentType)} - ${activeCaseData?.fileNumber || "Unknown"}`;
+      const documentContent = selectedTemplate 
+        ? generateDocumentContentFromTemplate(selectedTemplate.content, activeCaseData)
+        : generateDocumentContent(documentType, activeCaseData);
+        
+      const documentTitle = selectedTemplate 
+        ? `${selectedTemplate.name} - ${activeCaseData?.fileNumber || "Unknown"}`
+        : `${getDocumentTypeName(documentType)} - ${activeCaseData?.fileNumber || "Unknown"}`;
       
       // Create a new document record in the database
       const { data: docData, error } = await supabase
         .from('documents')
         .insert({
           title: documentTitle,
-          type: mapDocumentTypeToEnum(documentType),
+          type: selectedTemplate ? "Other" : mapDocumentTypeToEnum(documentType),
           case_id: selectedCase,
           status: "Draft",
           content: documentContent
@@ -355,6 +371,69 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     }
   };
 
+  // Replace template variables with actual case data
+  const generateDocumentContentFromTemplate = (templateContent: string, caseData?: Case): string => {
+    if (!caseData) return templateContent;
+    
+    const borrower = caseData.parties.find(p => p.type === "Borrower");
+    const lender = caseData.parties.find(p => p.type === "Lender");
+    
+    // Format helpers
+    const formatDate = (dateStr?: string) => {
+      if (!dateStr) return new Date().toLocaleDateString('en-CA');
+      return new Date(dateStr).toLocaleDateString('en-CA', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+    };
+    
+    const formatCurrency = (value?: number) => {
+      if (value === undefined) return "$0.00";
+      return new Intl.NumberFormat('en-CA', {
+        style: 'currency', currency: 'CAD'
+      }).format(value);
+    };
+    
+    // Replace variables in template
+    let content = templateContent;
+    
+    // Basic replacements
+    const replacements: Record<string, string> = {
+      '{date}': formatDate(),
+      '{property.address}': `${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province} ${caseData.property.address.postalCode}`,
+      '{property.street}': caseData.property.address.street,
+      '{property.city}': caseData.property.address.city,
+      '{property.province}': caseData.property.address.province,
+      '{property.postal_code}': caseData.property.address.postalCode,
+      '{property.pid}': caseData.property.pid || "[PID]",
+      '{property.legal_description}': caseData.property.legalDescription || "[Legal Description]",
+      '{mortgage.number}': caseData.mortgage.registrationNumber,
+      '{mortgage.principal}': formatCurrency(caseData.mortgage.principal),
+      '{mortgage.interest_rate}': `${caseData.mortgage.interestRate}%`,
+      '{mortgage.balance}': formatCurrency(caseData.mortgage.currentBalance),
+      '{mortgage.per_diem}': formatCurrency(caseData.mortgage.perDiemInterest),
+      '{mortgage.arrears}': formatCurrency(caseData.mortgage.arrears),
+      '{case.file_number}': caseData.fileNumber,
+      '{case.status}': caseData.status,
+      '{court.file_number}': caseData.court?.fileNumber || "[Court File Number]",
+      '{court.registry}': caseData.court?.registry || "Vancouver",
+      '{court.hearing_date}': formatDate(caseData.court?.hearingDate),
+      '{court.judge_name}': caseData.court?.judgeName || "[Judge Name]",
+      '{borrower.name}': borrower?.name || "[BORROWER NAME]",
+      '{borrower.address}': borrower?.contactInfo?.address || "[BORROWER ADDRESS]",
+      '{borrower.email}': borrower?.contactInfo?.email || "",
+      '{borrower.phone}': borrower?.contactInfo?.phone || "",
+      '{lender.name}': lender?.name || "[LENDER NAME]",
+      '{lender.address}': lender?.contactInfo?.address || ""
+    };
+    
+    // Replace all variables
+    for (const [key, value] of Object.entries(replacements)) {
+      content = content.replace(new RegExp(key, 'g'), value);
+    }
+    
+    return content;
+  };
+
   // Map our internal document type IDs to the enum values expected by the database
   const mapDocumentTypeToEnum = (docType: string): Document['type'] => {
     switch (docType) {
@@ -368,6 +447,10 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   };
 
   const getDocumentTypeName = (typeId: string): string => {
+    if (typeId.startsWith('template-')) {
+      const templateId = parseInt(typeId.split('-')[1]);
+      return templates.find(t => t.id === templateId)?.name || "Document";
+    }
     return templateTypes.find(t => t.id === typeId)?.name || "Document";
   };
 
@@ -388,7 +471,35 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     }
   };
   
-  // Generate document content based on template and case data
+  // Template types for document generation
+  const templateTypes = [
+    {
+      id: "demand",
+      name: "Demand Letter",
+      description: "Default demand letter with 10-day notice period",
+    },
+    {
+      id: "payout",
+      name: "Payout Statement",
+      description: "Statement of mortgage payout with per diem interest",
+    },
+    {
+      id: "petition",
+      name: "Petition Package",
+      description: "Complete foreclosure petition with supporting documents",
+    },
+    {
+      id: "ordernisi",
+      name: "Order Nisi",
+      description: "Order Nisi with redemption period",
+    },
+    {
+      id: "conduct",
+      name: "Conduct of Sale",
+      description: "Application for conduct of sale",
+    },
+  ];
+
   const generateDocumentContent = (docType: string, caseData?: Case): string => {
     if (!caseData) return "";
     
@@ -677,8 +788,23 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                 <SelectValue placeholder="Select document type" />
               </SelectTrigger>
               <SelectContent>
+                {/* Built-in templates */}
+                <SelectItem value="" disabled>Built-in Templates</SelectItem>
                 {templateTypes.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
+                    <div className="flex flex-col">
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {template.description}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+                
+                {/* Custom templates */}
+                {templates.length > 0 && <SelectItem value="" disabled className="mt-2">Custom Templates</SelectItem>}
+                {templates.map((template) => (
+                  <SelectItem key={`template-${template.id}`} value={`template-${template.id}`}>
                     <div className="flex flex-col">
                       <span>{template.name}</span>
                       <span className="text-xs text-muted-foreground">
@@ -705,7 +831,13 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                 
                 <div className="border rounded bg-muted/30 p-3 text-sm mb-3 max-h-60 overflow-y-auto">
                   <pre className="whitespace-pre-wrap font-sans">
-                    {generateDocumentContent(documentType, activeCaseData)}
+                    {documentType.startsWith('template-') 
+                      ? generateDocumentContentFromTemplate(
+                          templates.find(t => `template-${t.id}` === documentType)?.content || "",
+                          activeCaseData
+                        )
+                      : generateDocumentContent(documentType, activeCaseData)
+                    }
                   </pre>
                 </div>
               </div>
