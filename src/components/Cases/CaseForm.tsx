@@ -39,9 +39,13 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
           .update({ 
             file_number: fileNumber, 
             notes: notes,
-            // Add mock values for required fields if they don't exist in the initialData
-            mortgage_id: initialData.mortgage || '00000000-0000-0000-0000-000000000000',
-            property_id: initialData.property || '00000000-0000-0000-0000-000000000000'
+            // Handle mortgage_id and property_id differently to fix type errors
+            mortgage_id: typeof initialData.mortgage === 'string' 
+              ? initialData.mortgage 
+              : initialData.mortgage?.id || '00000000-0000-0000-0000-000000000000',
+            property_id: typeof initialData.property === 'string'
+              ? initialData.property
+              : initialData.property?.id || '00000000-0000-0000-0000-000000000000'
           })
           .eq('id', initialData.id)
           .select()

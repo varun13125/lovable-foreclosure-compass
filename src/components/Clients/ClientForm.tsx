@@ -15,14 +15,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { X } from "lucide-react";
+import { Party } from "@/types";
 
 const clientFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -51,22 +43,25 @@ const clientFormSchema = z.object({
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 
-interface ClientFormProps {
+export interface ClientFormProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  initialData?: Party;
+  inDialog?: boolean;
 }
 
-export default function ClientForm({ open, onClose, onSuccess }: ClientFormProps) {
+export default function ClientForm({ open, onClose, onSuccess, initialData, inDialog = true }: ClientFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: {
-      type: "Borrower",
-      email: "",
-      phone: "",
-      address: "",
+      name: initialData?.name || '',
+      type: initialData?.type || "Borrower",
+      email: initialData?.contactInfo.email || "",
+      phone: initialData?.contactInfo.phone || "",
+      address: initialData?.contactInfo.address || "",
     },
   });
 
@@ -74,22 +69,38 @@ export default function ClientForm({ open, onClose, onSuccess }: ClientFormProps
     setIsSubmitting(true);
     
     try {
-      // Insert new client into parties table
-      const { data: partyData, error } = await supabase
-        .from('parties')
-        .insert({
-          name: data.name,
-          type: data.type,
-          email: data.email || null,
-          phone: data.phone || null,
-          address: data.address || null,
-        })
-        .select('*')
-        .single();
+      if (initialData?.id) {
+        // Update existing client
+        const { error } = await supabase
+          .from('parties')
+          .update({
+            name: data.name,
+            type: data.type,
+            email: data.email || null,
+            phone: data.phone || null,
+            address: data.address || null,
+          })
+          .eq('id', initialData.id);
+          
+        if (error) throw error;
         
-      if (error) throw error;
-      
-      toast.success("Client created successfully");
+        toast.success("Client updated successfully");
+      } else {
+        // Insert new client
+        const { error } = await supabase
+          .from('parties')
+          .insert({
+            name: data.name,
+            type: data.type,
+            email: data.email || null,
+            phone: data.phone || null,
+            address: data.address || null,
+          });
+          
+        if (error) throw error;
+        
+        toast.success("Client created successfully");
+      }
       
       // Reset form
       form.reset();
@@ -98,127 +109,140 @@ export default function ClientForm({ open, onClose, onSuccess }: ClientFormProps
       if (onSuccess) onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error creating client:", error);
-      toast.error("Failed to create client");
+      console.error("Error with client:", error);
+      toast.error(initialData ? "Failed to update client" : "Failed to create client");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const formContent = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="grid gap-4 py-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Name" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Party Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select party type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="Borrower">Borrower</SelectItem>
+                    <SelectItem value="Lender">Lender</SelectItem>
+                    <SelectItem value="Client">Client</SelectItem>
+                    <SelectItem value="ThirdParty">Third Party</SelectItem>
+                    <SelectItem value="Lawyer">Lawyer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Address</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="Email" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="Phone" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Address</FormLabel>
+                <FormControl>
+                  <Textarea placeholder="Full address" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        
+        <div className="flex justify-end gap-2 mt-4">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            className="bg-law-teal hover:bg-law-teal/90"
+            disabled={isSubmitting}
+          >
+            {isSubmitting 
+              ? (initialData ? "Updating..." : "Creating...") 
+              : (initialData ? "Update Client" : "Create Client")
+            }
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+
+  if (!inDialog) {
+    return formContent;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>Add New Client</DialogTitle>
+          <DialogTitle>{initialData ? "Edit Client" : "Add New Client"}</DialogTitle>
           <DialogDescription>
-            Add a new client, borrower, lender or other party to the system
+            {initialData 
+              ? "Update client information" 
+              : "Add a new client, borrower, lender or other party to the system"
+            }
           </DialogDescription>
         </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-4 py-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Party Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select party type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Borrower">Borrower</SelectItem>
-                        <SelectItem value="Lender">Lender</SelectItem>
-                        <SelectItem value="Client">Client</SelectItem>
-                        <SelectItem value="ThirdParty">Third Party</SelectItem>
-                        <SelectItem value="Lawyer">Lawyer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="Email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Phone" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Full address" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                className="bg-law-teal hover:bg-law-teal/90"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Creating..." : "Create Client"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        {formContent}
       </DialogContent>
     </Dialog>
   );
