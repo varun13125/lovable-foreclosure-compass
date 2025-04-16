@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,16 +17,16 @@ export interface CaseFormProps {
 }
 
 const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, onError }) => {
-  const [caseName, setCaseName] = useState(initialData?.caseName || '');
-  const [description, setDescription] = useState(initialData?.description || '');
+  const [fileNumber, setFileNumber] = useState(initialData?.file_number || '');
+  const [notes, setNotes] = useState(initialData?.notes || '');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!caseName.trim()) {
-      toast.error("Case name is required.");
+    if (!fileNumber.trim()) {
+      toast.error("File number is required.");
       setIsLoading(false);
       return;
     }
@@ -35,7 +36,13 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
         // Update existing case
         const { data, error } = await supabase
           .from('cases')
-          .update({ caseName, description })
+          .update({ 
+            file_number: fileNumber, 
+            notes: notes,
+            // Add mock values for required fields if they don't exist in the initialData
+            mortgage_id: initialData.mortgage_id || '00000000-0000-0000-0000-000000000000',
+            property_id: initialData.property_id || '00000000-0000-0000-0000-000000000000'
+          })
           .eq('id', initialData.id)
           .select()
           .single();
@@ -49,10 +56,16 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
           onSuccess(initialData.id);
         }
       } else {
-        // Create new case
+        // Create new case with mock data for required fields
         const { data, error } = await supabase
           .from('cases')
-          .insert([{ caseName, description }])
+          .insert([{ 
+            file_number: fileNumber, 
+            notes: notes,
+            // Mock values for required fields
+            mortgage_id: '00000000-0000-0000-0000-000000000000',
+            property_id: '00000000-0000-0000-0000-000000000000'
+          }])
           .select()
           .single();
 
@@ -77,23 +90,23 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, onCancel, onSuccess, o
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="caseName">Case Name</Label>
+        <Label htmlFor="fileNumber">File Number</Label>
         <Input
-          id="caseName"
+          id="fileNumber"
           type="text"
-          placeholder="Enter case name"
-          value={caseName}
-          onChange={(e) => setCaseName(e.target.value)}
+          placeholder="Enter file number"
+          value={fileNumber}
+          onChange={(e) => setFileNumber(e.target.value)}
           disabled={isLoading}
         />
       </div>
       <div>
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="notes">Notes</Label>
         <Textarea
-          id="description"
-          placeholder="Enter case description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          id="notes"
+          placeholder="Enter case notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           disabled={isLoading}
         />
       </div>

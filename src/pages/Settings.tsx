@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,17 +24,20 @@ export default function Settings() {
     {
       id: 1,
       name: "Demand Letter",
-      description: "Default template for initial demands"
+      description: "Default template for initial demands",
+      content: "This is a sample demand letter template content."
     },
     {
       id: 2,
       name: "Petition",
-      description: "Standard foreclosure petition"
+      description: "Standard foreclosure petition",
+      content: "This is a sample petition template content."
     },
     {
       id: 3,
       name: "Order Nisi",
-      description: "Court order template"
+      description: "Court order template",
+      content: "This is a sample court order template content."
     }
   ]);
   
@@ -45,7 +47,15 @@ export default function Settings() {
     content: ""
   });
   
-  const [open, setOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<null | {
+    id: number;
+    name: string;
+    description: string;
+    content: string;
+  }>(null);
+  
+  const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
   
   const handleAddTemplate = () => {
     if (!newTemplate.name) {
@@ -60,7 +70,8 @@ export default function Settings() {
       {
         id: newId,
         name: newTemplate.name,
-        description: newTemplate.description
+        description: newTemplate.description,
+        content: newTemplate.content
       }
     ]);
     
@@ -70,8 +81,27 @@ export default function Settings() {
       content: ""
     });
     
-    setOpen(false);
+    setOpenAddDialog(false);
     toast.success("Template added successfully");
+  };
+
+  const handleEditTemplate = (template) => {
+    setEditingTemplate({...template});
+    setOpenEditDialog(true);
+  };
+
+  const handleUpdateTemplate = () => {
+    if (!editingTemplate?.name) {
+      toast.error("Template name is required");
+      return;
+    }
+
+    setTemplates(templates.map(t => 
+      t.id === editingTemplate.id ? editingTemplate : t
+    ));
+    
+    setOpenEditDialog(false);
+    toast.success("Template updated successfully");
   };
 
   return (
@@ -153,7 +183,7 @@ export default function Settings() {
                     <CardTitle>Document Templates</CardTitle>
                     <CardDescription>Manage your document templates for case generation</CardDescription>
                   </div>
-                  <Dialog open={open} onOpenChange={setOpen}>
+                  <Dialog open={openAddDialog} onOpenChange={setOpenAddDialog}>
                     <DialogTrigger asChild>
                       <Button className="bg-law-teal hover:bg-law-teal/90">
                         <Plus className="h-4 w-4 mr-2" />
@@ -199,7 +229,7 @@ export default function Settings() {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setOpenAddDialog(false)}>Cancel</Button>
                         <Button 
                           className="bg-law-teal hover:bg-law-teal/90"
                           onClick={handleAddTemplate}
@@ -221,7 +251,7 @@ export default function Settings() {
                         <div className="space-x-2">
                           <Button 
                             variant="outline"
-                            onClick={() => toast.info("Template edit view would open here")}
+                            onClick={() => handleEditTemplate(template)}
                           >
                             Edit
                           </Button>
@@ -332,6 +362,57 @@ export default function Settings() {
           </Tabs>
         </main>
       </div>
+      
+      <Dialog open={openEditDialog} onOpenChange={setOpenEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+            <DialogDescription>
+              Update your document template.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-name">Template Name</Label>
+              <Input
+                id="edit-template-name"
+                value={editingTemplate?.name || ''}
+                onChange={(e) => setEditingTemplate({...editingTemplate!, name: e.target.value})}
+                placeholder="e.g., Settlement Agreement"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-description">Description</Label>
+              <Input
+                id="edit-template-description"
+                value={editingTemplate?.description || ''}
+                onChange={(e) => setEditingTemplate({...editingTemplate!, description: e.target.value})}
+                placeholder="Brief description of the template"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-template-content">Template Content</Label>
+              <Textarea
+                id="edit-template-content"
+                rows={8}
+                value={editingTemplate?.content || ''}
+                onChange={(e) => setEditingTemplate({...editingTemplate!, content: e.target.value})}
+                placeholder="Enter the template content here..."
+                className="font-mono text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEditDialog(false)}>Cancel</Button>
+            <Button 
+              className="bg-law-teal hover:bg-law-teal/90"
+              onClick={handleUpdateTemplate}
+            >
+              Update Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -43,6 +43,7 @@ export default function Clients() {
   const [clients, setClients] = useState<Party[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [partyFilter, setPartyFilter] = useState<string>("All");
+  const [clientCaseCounts, setClientCaseCounts] = useState<Record<string, number>>({});
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -71,6 +72,9 @@ export default function Clients() {
       }));
       
       setClients(transformedParties);
+      
+      // Fetch case counts for each client
+      fetchCaseCounts(transformedParties);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast({
@@ -83,19 +87,44 @@ export default function Clients() {
     }
   };
   
+  // Fetch case counts for clients
+  const fetchCaseCounts = async (clientsList: Party[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('case_parties')
+        .select('party_id, case_id');
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Count cases per client
+      const counts: Record<string, number> = {};
+      
+      data.forEach(item => {
+        if (counts[item.party_id]) {
+          counts[item.party_id]++;
+        } else {
+          counts[item.party_id] = 1;
+        }
+      });
+      
+      setClientCaseCounts(counts);
+    } catch (error) {
+      console.error('Error fetching case counts:', error);
+    }
+  };
+  
   useEffect(() => {
     fetchClients();
   }, []);
-  
-  // Count number of cases per client
-  const clientCaseCounts: Record<string, number> = {};
   
   // Filter clients based on search query and party type filter
   const filteredClients = clients.filter(client =>
     (partyFilter === "All" || client.type === partyFilter) &&
     (searchQuery === "" ||
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.contactInfo.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.contactInfo.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (client.contactInfo.address && client.contactInfo.address.toLowerCase().includes(searchQuery.toLowerCase())))
   );
   
@@ -239,20 +268,28 @@ export default function Clients() {
                       </TableRow>
                     ) : (
                       filteredClients.map((client) => (
-                        <TableRow key={client.id}>
+                        <TableRow key={client.id} className="cursor-pointer" onClick={() => handleViewClient(client)}>
                           <TableCell className="font-medium">{client.name}</TableCell>
                           <TableCell>{client.type}</TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <div className="flex items-center gap-1">
                                 <Mail className="h-3 w-3 text-muted-foreground" />
-                                <a href={`mailto:${client.contactInfo.email}`} className="text-sm hover:underline">
+                                <a 
+                                  href={`mailto:${client.contactInfo.email}`} 
+                                  className="text-sm hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   {client.contactInfo.email || 'No email'}
                                 </a>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Phone className="h-3 w-3 text-muted-foreground" />
-                                <a href={`tel:${client.contactInfo.phone}`} className="text-sm hover:underline">
+                                <a 
+                                  href={`tel:${client.contactInfo.phone}`} 
+                                  className="text-sm hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   {client.contactInfo.phone || 'No phone'}
                                 </a>
                               </div>
@@ -265,16 +302,28 @@ export default function Clients() {
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewClient(client)}>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewClient(client);
+                                  }}
+                                >
                                   <Eye className="mr-2 h-4 w-4" /> View Details
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditClient(client)}>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditClient(client);
+                                  }}
+                                >
                                   <FileEdit className="mr-2 h-4 w-4" /> Edit Client
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -423,6 +472,13 @@ export default function Clients() {
                   {selectedClient.contactInfo.address || "Not provided"}
                 </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Cases:</div>
+                <div className="col-span-2">
+                  {clientCaseCounts[selectedClient.id] || 0}
+                </div>
+              </div>
               
               <div className="flex justify-end gap-2 pt-4">
                 <Button 
@@ -436,6 +492,7 @@ export default function Clients() {
                     setIsViewClientOpen(false);
                     handleEditClient(selectedClient);
                   }}
+                  className="bg-law-teal hover:bg-law-teal/90"
                 >
                   Edit Client
                 </Button>
@@ -445,7 +502,30 @@ export default function Clients() {
         </DialogContent>
       </Dialog>
 
-      {/* Update client form will be integrated with ClientForm component */}
+      {/* Edit Client Dialog */}
+      <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>
+              Update client information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedClient && (
+            <ClientForm 
+              initialData={selectedClient}
+              open={isEditClientOpen}
+              onClose={() => setIsEditClientOpen(false)}
+              onSuccess={() => {
+                fetchClients();
+                setIsEditClientOpen(false);
+              }}
+              inDialog={false}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

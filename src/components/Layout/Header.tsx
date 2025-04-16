@@ -14,9 +14,10 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Header() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState([
     { id: 1, title: "New case added", message: "Case #FC-2025-0042 has been assigned to you", read: false, time: "10 min ago" },
@@ -30,6 +31,7 @@ export default function Header() {
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     );
+    toast.success("Notification marked as read");
   };
 
   const markAllAsRead = () => {
@@ -39,10 +41,28 @@ export default function Header() {
     toast.success("All notifications marked as read");
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      toast.info(`Searching for: ${searchQuery}`);
+      // Could implement actual search functionality here
+    }
+  };
+
+  const handleLogout = () => {
+    toast.success("You have been logged out", { 
+      description: "Redirecting to login page..." 
+    });
+    // Simulate redirection after a short delay
+    setTimeout(() => {
+      navigate('/');
+    }, 1500);
+  };
+
   return (
     <header className="flex h-16 items-center px-6 border-b bg-white dark:bg-slate-900">
       <div className="flex-1 flex items-center">
-        <form className="relative w-72">
+        <form className="relative w-72" onSubmit={handleSearch}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search cases, documents..." 
@@ -90,7 +110,7 @@ export default function Header() {
                   onSelect={e => e.preventDefault()}
                 >
                   <div 
-                    className={`p-3 w-full cursor-default ${!notification.read ? 'bg-muted/50' : ''}`}
+                    className={`p-3 w-full cursor-pointer ${!notification.read ? 'bg-muted/50' : ''}`}
                     onClick={() => markAsRead(notification.id)}
                   >
                     <div className="flex justify-between items-start mb-1">
@@ -108,7 +128,9 @@ export default function Header() {
                 variant="ghost" 
                 size="sm" 
                 className="w-full text-muted-foreground"
-                onClick={() => toast.info("View all notifications would go here")}
+                onClick={() => toast.info("View all notifications", {
+                  description: "This would navigate to a full notifications page"
+                })}
               >
                 View all notifications
               </Button>
@@ -139,21 +161,17 @@ export default function Header() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <User className="mr-2 h-4 w-4" />
-                <Link to="/settings" className="w-full">Profile</Link>
+                <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
-                <Link to="/settings" className="w-full">Settings</Link>
+                <span>Settings</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => toast.success("You have been logged out", { 
-                description: "Redirecting to login page..." 
-              })}
-            >
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
