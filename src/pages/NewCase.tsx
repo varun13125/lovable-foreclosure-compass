@@ -45,11 +45,13 @@ export default function NewCase() {
             <h1 className="text-2xl font-bold">Create New Case</h1>
           </div>
 
-          <CaseForm 
-            onCancel={handleCancelClick}
-            onSuccess={handleSuccess}
-            onError={handleError}
-          />
+          <div className="max-w-4xl mx-auto">
+            <CaseForm 
+              onCancel={handleCancelClick}
+              onSuccess={handleSuccess}
+              onError={handleError}
+            />
+          </div>
         </main>
       </div>
     </div>
