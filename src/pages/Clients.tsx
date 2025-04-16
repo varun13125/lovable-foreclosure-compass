@@ -18,6 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
@@ -30,6 +37,9 @@ import { Party } from "@/types";
 export default function Clients() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+  const [isViewClientOpen, setIsViewClientOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Party | null>(null);
   const [clients, setClients] = useState<Party[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [partyFilter, setPartyFilter] = useState<string>("All");
@@ -103,6 +113,52 @@ export default function Clients() {
       partiesByType[party.type].push(party);
     }
   });
+
+  const handleViewClient = (client: Party) => {
+    setSelectedClient(client);
+    setIsViewClientOpen(true);
+  };
+
+  const handleEditClient = (client: Party) => {
+    setSelectedClient(client);
+    setIsEditClientOpen(true);
+  };
+
+  const handleUpdateClient = async (updatedClient: any) => {
+    try {
+      const { error } = await supabase
+        .from('parties')
+        .update({
+          name: updatedClient.name,
+          type: updatedClient.type,
+          email: updatedClient.email || null,
+          phone: updatedClient.phone || null,
+          address: updatedClient.address || null
+        })
+        .eq('id', updatedClient.id);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Client updated",
+        description: "Client details have been updated successfully."
+      });
+      
+      setIsEditClientOpen(false);
+      fetchClients(); // Refresh the client list
+    } catch (error) {
+      console.error("Error updating client:", error);
+      toast({
+        title: "Update failed",
+        description: "There was a problem updating the client.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleClientTypeClick = (type: string) => {
+    setPartyFilter(type);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,10 +271,10 @@ export default function Clients() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="cursor-pointer">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewClient(client)}>
                                   <Eye className="mr-2 h-4 w-4" /> View Details
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="cursor-pointer">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditClient(client)}>
                                   <FileEdit className="mr-2 h-4 w-4" /> Edit Client
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -240,7 +296,10 @@ export default function Clients() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 border rounded-md">
+                  <div 
+                    className="flex justify-between items-center p-3 border rounded-md cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleClientTypeClick("Borrower")}
+                  >
                     <div>
                       <div className="font-medium">Borrowers</div>
                       <div className="text-sm text-muted-foreground">Mortgage borrowers</div>
@@ -250,7 +309,10 @@ export default function Clients() {
                     </div>
                   </div>
                   
-                  <div className="flex justify-between items-center p-3 border rounded-md">
+                  <div 
+                    className="flex justify-between items-center p-3 border rounded-md cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleClientTypeClick("Lender")}
+                  >
                     <div>
                       <div className="font-medium">Lenders</div>
                       <div className="text-sm text-muted-foreground">Financial institutions</div>
@@ -260,7 +322,10 @@ export default function Clients() {
                     </div>
                   </div>
                   
-                  <div className="flex justify-between items-center p-3 border rounded-md">
+                  <div 
+                    className="flex justify-between items-center p-3 border rounded-md cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleClientTypeClick("ThirdParty")}
+                  >
                     <div>
                       <div className="font-medium">Third Parties</div>
                       <div className="text-sm text-muted-foreground">Other stakeholders</div>
@@ -281,7 +346,11 @@ export default function Clients() {
                 <div className="space-y-4">
                   {clients.length > 0 ? (
                     clients.slice(0, 3).map((client, index) => (
-                      <div key={index} className="p-3 border rounded-md">
+                      <div 
+                        key={index} 
+                        className="p-3 border rounded-md cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleViewClient(client)}  
+                      >
                         <div className="flex justify-between">
                           <div className="font-medium">Client Added</div>
                           <div className="text-xs text-muted-foreground">
@@ -311,6 +380,72 @@ export default function Clients() {
         onClose={() => setIsAddClientOpen(false)}
         onSuccess={() => fetchClients()}
       />
+
+      {/* View Client Dialog */}
+      <Dialog open={isViewClientOpen} onOpenChange={setIsViewClientOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Client Details</DialogTitle>
+            <DialogDescription>
+              View all details for this client
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedClient && (
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Name:</div>
+                <div className="col-span-2">{selectedClient.name}</div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Type:</div>
+                <div className="col-span-2">{selectedClient.type}</div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Email:</div>
+                <div className="col-span-2">
+                  {selectedClient.contactInfo.email || "Not provided"}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Phone:</div>
+                <div className="col-span-2">
+                  {selectedClient.contactInfo.phone || "Not provided"}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <div className="font-medium text-muted-foreground">Address:</div>
+                <div className="col-span-2">
+                  {selectedClient.contactInfo.address || "Not provided"}
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsViewClientOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsViewClientOpen(false);
+                    handleEditClient(selectedClient);
+                  }}
+                >
+                  Edit Client
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Update client form will be integrated with ClientForm component */}
     </div>
   );
 }

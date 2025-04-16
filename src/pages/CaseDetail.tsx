@@ -196,9 +196,17 @@ export default function CaseDetail() {
       // Add timestamp to notes
       const now = new Date();
       const timestamp = now.toLocaleString();
-      const updatedNotes = notes.trim() ? 
-        `${notes}\n\n[${timestamp}] ` : 
-        `[${timestamp}] `;
+      let updatedNotes = "";
+      
+      // Format: [timestamp] User note
+      if (notes.trim()) {
+        updatedNotes = activeCase.notes 
+          ? `${activeCase.notes}\n\n[${timestamp}] ${notes.trim()}`
+          : `[${timestamp}] ${notes.trim()}`;
+      } else {
+        // If note is empty, don't add anything
+        updatedNotes = activeCase.notes || '';
+      }
       
       const { error } = await supabase
         .from('cases')
@@ -216,7 +224,7 @@ export default function CaseDetail() {
         notes: updatedNotes
       });
       
-      setNotes(updatedNotes);
+      setNotes(""); // Clear the input field after saving
     } catch (error) {
       console.error("Error updating notes:", error);
       toast.error("Failed to update notes");
@@ -291,7 +299,7 @@ export default function CaseDetail() {
               <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
             </div>
             <CaseForm 
-              existingCase={activeCase}
+              caseData={activeCase}
               onCancel={() => {
                 window.location.href = `/case/${id}`;
               }}
@@ -576,7 +584,7 @@ export default function CaseDetail() {
                   <CardTitle>Case Notes</CardTitle>
                   {!isEditingNotes ? (
                     <Button size="sm" variant="outline" onClick={() => setIsEditingNotes(true)}>
-                      <Edit className="h-4 w-4 mr-2" /> Edit Notes
+                      <Edit className="h-4 w-4 mr-2" /> Add Note
                     </Button>
                   ) : (
                     <div className="flex gap-2">
@@ -584,7 +592,7 @@ export default function CaseDetail() {
                         <Save className="h-4 w-4 mr-2" /> Save
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => {
-                        setNotes(activeCase.notes || '');
+                        setNotes('');
                         setIsEditingNotes(false);
                       }}>
                         <X className="h-4 w-4 mr-2" /> Cancel
