@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,6 +37,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { CheckCircle, PlusCircle } from "lucide-react";
+import { Party } from "@/types";
 
 const formSchema = z.object({
   // Basic Info
@@ -65,13 +67,33 @@ const formSchema = z.object({
   perDiemInterest: z.coerce.number().min(0, "Per diem interest must be a positive number"),
   
   // Parties
-  borrowerName: z.string().min(1, "Borrower name is required"),
+  borrowerType: z.enum(['new', 'existing']).default('new'),
+  borrowerId: z.string().optional(),
+  borrowerName: z.string().optional(),
   borrowerEmail: z.string().email("Invalid email").optional().or(z.literal('')),
   borrowerPhone: z.string().optional(),
   
-  lenderName: z.string().min(1, "Lender name is required"),
+  lenderType: z.enum(['new', 'existing']).default('new'),
+  lenderId: z.string().optional(),
+  lenderName: z.string().optional(),
   lenderEmail: z.string().email("Invalid email").optional().or(z.literal('')),
   lenderPhone: z.string().optional(),
+}).refine(data => {
+  if (data.borrowerType === 'new') {
+    return !!data.borrowerName;
+  }
+  return !!data.borrowerId;
+}, {
+  message: "Borrower name is required for new borrower",
+  path: ['borrowerName']
+}).refine(data => {
+  if (data.lenderType === 'new') {
+    return !!data.lenderName;
+  }
+  return !!data.lenderId;
+}, {
+  message: "Lender name is required for new lender",
+  path: ['lenderName']
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -82,6 +104,8 @@ interface CaseFormProps {
 
 export default function CaseForm({ onCancel }: CaseFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingBorrowers, setExistingBorrowers] = useState<Party[]>([]);
+  const [existingLenders, setExistingLenders] = useState<Party[]>([]);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -89,8 +113,60 @@ export default function CaseForm({ onCancel }: CaseFormProps) {
       status: "New",
       province: "BC",
       propertyType: "Residential",
+      borrowerType: "new",
+      lenderType: "new",
     },
   });
+
+  // Watch the borrower and lender type to show/hide fields
+  const borrowerType = form.watch("borrowerType");
+  const lenderType = form.watch("lenderType");
+  
+  // Fetch existing borrowers and lenders
+  useEffect(() => {
+    const fetchParties = async () => {
+      try {
+        // Fetch borrowers
+        const { data: borrowers, error: borrowersError } = await supabase
+          .from('parties')
+          .select('*')
+          .eq('type', 'Borrower');
+          
+        if (borrowersError) throw borrowersError;
+        setExistingBorrowers(borrowers as Party[]);
+        
+        // Fetch lenders
+        const { data: lenders, error: lendersError } = await supabase
+          .from('parties')
+          .select('*')
+          .eq('type', 'Lender');
+          
+        if (lendersError) throw lendersError;
+        setExistingLenders(lenders as Party[]);
+      } catch (error) {
+        console.error('Error fetching parties:', error);
+        toast.error("Failed to load existing clients");
+      }
+    };
+    
+    fetchParties();
+  }, []);
+
+  // Handle borrower selection
+  const handleBorrowerSelect = (id: string) => {
+    const selectedBorrower = existingBorrowers.find(b => b.id === id);
+    if (selectedBorrower) {
+      form.setValue("borrowerId", selectedBorrower.id);
+    }
+  };
+  
+  // Handle lender selection
+  const handleLenderSelect = (id: string) => {
+    const selectedLender = existingLenders.find(l => l.id === id);
+    if (selectedLender) {
+      form.setValue("lenderId", selectedLender.id);
+    }
+  };
 
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
@@ -147,41 +223,56 @@ export default function CaseForm({ onCancel }: CaseFormProps) {
         
       if (caseError) throw caseError;
       
-      // Step 4: Create parties
-      const borrower = {
-        name: data.borrowerName,
-        email: data.borrowerEmail || null,
-        phone: data.borrowerPhone || null,
-        type: "Borrower" as const,
-      };
+      // Step 4: Create or link borrower
+      let borrowerId: string;
       
-      const lender = {
-        name: data.lenderName,
-        email: data.lenderEmail || null,
-        phone: data.lenderPhone || null,
-        type: "Lender" as const,
-      };
-      
-      const { data: borrowerData, error: borrowerError } = await supabase
-        .from('parties')
-        .insert(borrower)
-        .select('id')
-        .single();
+      if (data.borrowerType === 'new') {
+        const borrower = {
+          name: data.borrowerName!,
+          email: data.borrowerEmail || null,
+          phone: data.borrowerPhone || null,
+          type: "Borrower" as const,
+        };
         
-      if (borrowerError) throw borrowerError;
+        const { data: borrowerData, error: borrowerError } = await supabase
+          .from('parties')
+          .insert(borrower)
+          .select('id')
+          .single();
+          
+        if (borrowerError) throw borrowerError;
+        borrowerId = borrowerData.id;
+      } else {
+        borrowerId = data.borrowerId!;
+      }
       
-      const { data: lenderData, error: lenderError } = await supabase
-        .from('parties')
-        .insert(lender)
-        .select('id')
-        .single();
+      // Step 5: Create or link lender
+      let lenderId: string;
+      
+      if (data.lenderType === 'new') {
+        const lender = {
+          name: data.lenderName!,
+          email: data.lenderEmail || null,
+          phone: data.lenderPhone || null,
+          type: "Lender" as const,
+        };
         
-      if (lenderError) throw lenderError;
+        const { data: lenderData, error: lenderError } = await supabase
+          .from('parties')
+          .insert(lender)
+          .select('id')
+          .single();
+          
+        if (lenderError) throw lenderError;
+        lenderId = lenderData.id;
+      } else {
+        lenderId = data.lenderId!;
+      }
       
-      // Step 5: Link parties to case
+      // Step 6: Link parties to case
       const casePartiesData = [
-        { case_id: caseData.id, party_id: borrowerData.id },
-        { case_id: caseData.id, party_id: lenderData.id }
+        { case_id: caseData.id, party_id: borrowerId },
+        { case_id: caseData.id, party_id: lenderId }
       ];
       
       const { error: casePartiesError } = await supabase
@@ -567,99 +658,221 @@ export default function CaseForm({ onCancel }: CaseFormProps) {
               
               {/* Parties Tab */}
               <TabsContent value="parties">
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Borrower Information */}
                   <div className="border rounded-lg p-4 pb-6">
                     <h3 className="font-medium mb-3">Borrower Information</h3>
-                    <div className="grid gap-3">
+                    
+                    <FormField
+                      control={form.control}
+                      name="borrowerType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-4 mb-4">
+                            <Button 
+                              type="button" 
+                              variant={field.value === 'existing' ? "default" : "outline"}
+                              onClick={() => form.setValue("borrowerType", "existing")}
+                              className="flex-1"
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Existing Borrower
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant={field.value === 'new' ? "default" : "outline"}
+                              onClick={() => form.setValue("borrowerType", "new")}
+                              className="flex-1"
+                            >
+                              <PlusCircle className="mr-2 h-4 w-4" />
+                              New Borrower
+                            </Button>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {borrowerType === 'existing' ? (
                       <FormField
                         control={form.control}
-                        name="borrowerName"
+                        name="borrowerId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Full legal name" {...field} />
-                            </FormControl>
+                            <FormLabel>Select Borrower</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(value);
+                              handleBorrowerSelect(value);
+                            }}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select borrower" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {existingBorrowers.map(borrower => (
+                                  <SelectItem key={borrower.id} value={borrower.id}>
+                                    {borrower.name} - {borrower.contactInfo?.email || 'No email'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <div className="grid grid-cols-2 gap-3">
+                    ) : (
+                      <div className="grid gap-3">
                         <FormField
                           control={form.control}
-                          name="borrowerEmail"
+                          name="borrowerName"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Email</FormLabel>
+                              <FormLabel>Full Name</FormLabel>
                               <FormControl>
-                                <Input type="email" placeholder="Email address" {...field} />
+                                <Input placeholder="Full legal name" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          control={form.control}
-                          name="borrowerPhone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Phone number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="borrowerEmail"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="Email address" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="borrowerPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Phone number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   
+                  {/* Lender Information */}
                   <div className="border rounded-lg p-4 pb-6">
                     <h3 className="font-medium mb-3">Lender Information</h3>
-                    <div className="grid gap-3">
+                    
+                    <FormField
+                      control={form.control}
+                      name="lenderType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center space-x-4 mb-4">
+                            <Button 
+                              type="button" 
+                              variant={field.value === 'existing' ? "default" : "outline"}
+                              onClick={() => form.setValue("lenderType", "existing")}
+                              className="flex-1"
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Existing Lender
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant={field.value === 'new' ? "default" : "outline"}
+                              onClick={() => form.setValue("lenderType", "new")}
+                              className="flex-1"
+                            >
+                              <PlusCircle className="mr-2 h-4 w-4" />
+                              New Lender
+                            </Button>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {lenderType === 'existing' ? (
                       <FormField
                         control={form.control}
-                        name="lenderName"
+                        name="lenderId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Institution Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Financial institution name" {...field} />
-                            </FormControl>
+                            <FormLabel>Select Lender</FormLabel>
+                            <Select onValueChange={(value) => {
+                              field.onChange(value);
+                              handleLenderSelect(value);
+                            }}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select lender" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {existingLenders.map(lender => (
+                                  <SelectItem key={lender.id} value={lender.id}>
+                                    {lender.name} - {lender.contactInfo?.email || 'No email'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <div className="grid grid-cols-2 gap-3">
+                    ) : (
+                      <div className="grid gap-3">
                         <FormField
                           control={form.control}
-                          name="lenderEmail"
+                          name="lenderName"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Email</FormLabel>
+                              <FormLabel>Institution Name</FormLabel>
                               <FormControl>
-                                <Input type="email" placeholder="Email address" {...field} />
+                                <Input placeholder="Financial institution name" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        <FormField
-                          control={form.control}
-                          name="lenderPhone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Phone</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Phone number" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="lenderEmail"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="Email address" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="lenderPhone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Phone number" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </TabsContent>

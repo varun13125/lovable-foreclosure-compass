@@ -10,7 +10,7 @@ export default function NewCase() {
   const navigate = useNavigate();
 
   const handleCancel = () => {
-    navigate('/');
+    navigate('/cases');
   };
 
   return (
