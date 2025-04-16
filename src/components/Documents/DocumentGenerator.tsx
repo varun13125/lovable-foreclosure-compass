@@ -286,7 +286,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
             postalCode: caseData.property.postal_code || ''
           },
           pid: caseData.property.pid || '',
-          legalDescription: caseData.property.legal_description || '',
+          legalDescription: caseData.property.legalDescription || '',
           propertyType: caseData.property.property_type
         },
         mortgage: {
@@ -296,7 +296,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
           interestRate: caseData.mortgage.interest_rate,
           startDate: caseData.mortgage.start_date,
           currentBalance: caseData.mortgage.current_balance,
-          perDiemInterest: caseData.mortgage.per_diem_interest,
+          perDiemInterest: caseData.mortgage.perDiemInterest,
           arrears: caseData.mortgage.arrears
         },
         parties: parties,
@@ -789,7 +789,7 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
               </SelectTrigger>
               <SelectContent>
                 {/* Built-in templates */}
-                <SelectItem value="" disabled>Built-in Templates</SelectItem>
+                <SelectItem value="built-in-header" disabled>Built-in Templates</SelectItem>
                 {templateTypes.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     <div className="flex flex-col">
@@ -802,7 +802,7 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                 ))}
                 
                 {/* Custom templates */}
-                {templates.length > 0 && <SelectItem value="" disabled className="mt-2">Custom Templates</SelectItem>}
+                {templates.length > 0 && <SelectItem value="custom-header" disabled className="mt-2">Custom Templates</SelectItem>}
                 {templates.map((template) => (
                   <SelectItem key={`template-${template.id}`} value={`template-${template.id}`}>
                     <div className="flex flex-col">
