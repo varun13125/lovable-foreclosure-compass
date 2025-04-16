@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Check, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { CalendarIcon, Check, Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,8 +29,9 @@ export default function Reports() {
     from: undefined,
     to: undefined,
   });
-  const [format, setFormat] = useState("pdf");
+  const [formatType, setFormatType] = useState("pdf");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportData, setReportData] = useState<any[] | null>(null);
 
   const handleGenerateReport = async () => {
     if (!reportType) {
@@ -39,21 +40,127 @@ export default function Reports() {
     }
 
     setIsGenerating(true);
+    setReportData(null);
     
-    // Simulate report generation
-    setTimeout(() => {
-      setIsGenerating(false);
-      toast.success("Report generated successfully", {
-        description: `Your ${reportType} report is ready to download.`,
-        action: {
-          label: "Download",
-          onClick: () => {
-            // Simulate download
-            console.log("Downloading report:", reportType);
+    try {
+      // Simulate fetching report data
+      let data = [];
+      
+      switch (reportType) {
+        case "case-status":
+          data = [
+            { status: "New", count: 12 },
+            { status: "In Progress", count: 8 },
+            { status: "Discovery", count: 5 },
+            { status: "Trial", count: 3 },
+            { status: "Closed", count: 7 },
+          ];
+          break;
+        case "financial":
+          data = [
+            { month: "Jan", revenue: 12500, expenses: 8200 },
+            { month: "Feb", revenue: 15000, expenses: 9100 },
+            { month: "Mar", revenue: 18200, expenses: 10400 },
+            { month: "Apr", revenue: 17800, expenses: 9800 },
+            { month: "May", revenue: 21000, expenses: 11200 },
+          ];
+          break;
+        case "activity":
+          data = [
+            { date: "2025-04-12", action: "Document Filed", case: "Johnson v. State" },
+            { date: "2025-04-10", action: "Client Meeting", case: "Smith Property Dispute" },
+            { date: "2025-04-08", action: "Court Hearing", case: "Davidson Trust" },
+            { date: "2025-04-05", action: "Settlement Negotiation", case: "Metro Inc. Merger" },
+            { date: "2025-04-01", action: "Brief Submitted", case: "Taylor Appeal" },
+          ];
+          break;
+        case "custom":
+          data = [
+            { field1: "Sample data", field2: "Custom value", field3: "Additional info" },
+            { field1: "More data", field2: "Custom metric", field3: "Supplemental details" },
+            { field1: "Other data", field2: "Custom analysis", field3: "Context information" },
+          ];
+          break;
+      }
+      
+      setTimeout(() => {
+        setReportData(data);
+        setIsGenerating(false);
+        toast.success("Report generated successfully", {
+          description: `Your ${reportType} report is ready to view or download.`,
+          action: {
+            label: "Download",
+            onClick: () => handleDownloadReport(),
           },
-        },
-      });
-    }, 2000);
+        });
+      }, 1500);
+      
+    } catch (error) {
+      setIsGenerating(false);
+      toast.error("Failed to generate report");
+      console.error("Report generation error:", error);
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!reportData) return;
+    
+    const reportTitle = reportType.replace("-", "_");
+    const fileName = `${reportTitle}_report_${formatDate(new Date())}.${formatType}`;
+    
+    // Convert reportData to appropriate format
+    let content = '';
+    
+    if (formatType === 'csv') {
+      content = convertToCSV(reportData);
+      downloadFile(content, fileName, 'text/csv');
+    } else if (formatType === 'excel') {
+      content = convertToCSV(reportData); // For demo we'll just use CSV for Excel too
+      downloadFile(content, fileName, 'application/vnd.ms-excel');
+    } else {
+      // For PDF, we'll just simulate a download
+      toast.info("Preparing PDF for download...");
+      setTimeout(() => {
+        toast.success("PDF ready");
+        // In a real implementation, we would generate a PDF here
+      }, 1000);
+    }
+    
+    console.info("Downloading report:", reportType);
+  };
+  
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const convertToCSV = (data: any[]) => {
+    if (!data || data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const headerRow = headers.join(',');
+    const rows = data.map(row => {
+      return headers.map(header => {
+        const cell = row[header] === null || row[header] === undefined ? '' : row[header];
+        return typeof cell === 'string' ? `"${cell}"` : cell;
+      }).join(',');
+    });
+    
+    return [headerRow, ...rows].join('\n');
+  };
+  
+  const downloadFile = (content: string, fileName: string, contentType: string) => {
+    const blob = new Blob([content], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const getReportDescription = () => {
@@ -269,7 +376,7 @@ export default function Reports() {
                           
                           <div className="space-y-2">
                             <Label htmlFor="format">Export Format</Label>
-                            <Select defaultValue="pdf" onValueChange={setFormat}>
+                            <Select defaultValue="pdf" onValueChange={setFormatType}>
                               <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select format" />
                               </SelectTrigger>
@@ -353,6 +460,56 @@ export default function Reports() {
               </Card>
             </div>
           </div>
+
+          {reportData && (
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>
+                    {reportType === "case-status" 
+                      ? "Case Status Summary" 
+                      : reportType === "financial" 
+                      ? "Financial Report" 
+                      : reportType === "activity"
+                      ? "Activity Timeline"
+                      : "Custom Report"}
+                  </CardTitle>
+                  <Button 
+                    variant="outline"
+                    onClick={handleDownloadReport}
+                    className="flex items-center"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b">
+                        {reportData.length > 0 && 
+                          Object.keys(reportData[0]).map((key) => (
+                            <th key={key} className="text-left p-2">{key.charAt(0).toUpperCase() + key.slice(1)}</th>
+                          ))
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.map((row, index) => (
+                        <tr key={index} className="border-b">
+                          {Object.values(row).map((value: any, i) => (
+                            <td key={i} className="p-2">{value}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     </div>

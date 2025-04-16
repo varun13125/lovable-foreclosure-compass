@@ -1,11 +1,79 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 
 export default function Settings() {
+  const [templates, setTemplates] = useState([
+    {
+      id: 1,
+      name: "Demand Letter",
+      description: "Default template for initial demands"
+    },
+    {
+      id: 2,
+      name: "Petition",
+      description: "Standard foreclosure petition"
+    },
+    {
+      id: 3,
+      name: "Order Nisi",
+      description: "Court order template"
+    }
+  ]);
+  
+  const [newTemplate, setNewTemplate] = useState({
+    name: "",
+    description: "",
+    content: ""
+  });
+  
+  const [open, setOpen] = useState(false);
+  
+  const handleAddTemplate = () => {
+    if (!newTemplate.name) {
+      toast.error("Template name is required");
+      return;
+    }
+    
+    const newId = templates.length ? Math.max(...templates.map(t => t.id)) + 1 : 1;
+    
+    setTemplates([
+      ...templates,
+      {
+        id: newId,
+        name: newTemplate.name,
+        description: newTemplate.description
+      }
+    ]);
+    
+    setNewTemplate({
+      name: "",
+      description: "",
+      content: ""
+    });
+    
+    setOpen(false);
+    toast.success("Template added successfully");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -34,40 +102,45 @@ export default function Settings() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Full Name</label>
-                      <input 
+                      <Label htmlFor="fullName">Full Name</Label>
+                      <Input 
+                        id="fullName"
                         type="text" 
-                        className="w-full p-2 border rounded-md" 
                         defaultValue="Jennifer Lee"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Email</label>
-                      <input 
+                      <Label htmlFor="email">Email</Label>
+                      <Input 
+                        id="email"
                         type="email" 
-                        className="w-full p-2 border rounded-md" 
                         defaultValue="jennifer@forelaw.com"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Job Title</label>
-                      <input 
+                      <Label htmlFor="jobTitle">Job Title</Label>
+                      <Input 
+                        id="jobTitle"
                         type="text" 
-                        className="w-full p-2 border rounded-md" 
                         defaultValue="Associate"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Phone</label>
-                      <input 
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input 
+                        id="phone"
                         type="text" 
-                        className="w-full p-2 border rounded-md" 
                         defaultValue="(555) 123-4567"
                       />
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <Button className="bg-law-teal hover:bg-law-teal/90">Save Changes</Button>
+                    <Button 
+                      className="bg-law-teal hover:bg-law-teal/90"
+                      onClick={() => toast.success("Profile updated successfully")}
+                    >
+                      Save Changes
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -75,36 +148,91 @@ export default function Settings() {
             
             <TabsContent value="templates">
               <Card>
-                <CardHeader>
-                  <CardTitle>Document Templates</CardTitle>
-                  <CardDescription>Manage your document templates for case generation</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Document Templates</CardTitle>
+                    <CardDescription>Manage your document templates for case generation</CardDescription>
+                  </div>
+                  <Dialog open={open} onOpenChange={setOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-law-teal hover:bg-law-teal/90">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Template
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Template</DialogTitle>
+                        <DialogDescription>
+                          Create a new document template for your cases.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="template-name">Template Name</Label>
+                          <Input
+                            id="template-name"
+                            value={newTemplate.name}
+                            onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                            placeholder="e.g., Settlement Agreement"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="template-description">Description</Label>
+                          <Input
+                            id="template-description"
+                            value={newTemplate.description}
+                            onChange={(e) => setNewTemplate({...newTemplate, description: e.target.value})}
+                            placeholder="Brief description of the template"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="template-content">Template Content</Label>
+                          <Textarea
+                            id="template-content"
+                            rows={8}
+                            value={newTemplate.content}
+                            onChange={(e) => setNewTemplate({...newTemplate, content: e.target.value})}
+                            placeholder="Enter the template content here..."
+                            className="font-mono text-sm"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button 
+                          className="bg-law-teal hover:bg-law-teal/90"
+                          onClick={handleAddTemplate}
+                        >
+                          Add Template
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 border rounded-md">
-                      <div>
-                        <p className="font-medium">Demand Letter</p>
-                        <p className="text-sm text-muted-foreground">Default template for initial demands</p>
+                    {templates.map((template) => (
+                      <div key={template.id} className="flex justify-between items-center p-3 border rounded-md">
+                        <div>
+                          <p className="font-medium">{template.name}</p>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </div>
+                        <div className="space-x-2">
+                          <Button 
+                            variant="outline"
+                            onClick={() => toast.info("Template edit view would open here")}
+                          >
+                            Edit
+                          </Button>
+                        </div>
                       </div>
-                      <Button variant="outline">Edit</Button>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded-md">
-                      <div>
-                        <p className="font-medium">Petition</p>
-                        <p className="text-sm text-muted-foreground">Standard foreclosure petition</p>
+                    ))}
+                    {templates.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No templates found. Create your first template.</p>
                       </div>
-                      <Button variant="outline">Edit</Button>
-                    </div>
-                    <div className="flex justify-between items-center p-3 border rounded-md">
-                      <div>
-                        <p className="font-medium">Order Nisi</p>
-                        <p className="text-sm text-muted-foreground">Court order template</p>
-                      </div>
-                      <Button variant="outline">Edit</Button>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button className="bg-law-teal hover:bg-law-teal/90">Add New Template</Button>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -123,24 +251,29 @@ export default function Settings() {
                         <p className="font-medium">Email Notifications</p>
                         <p className="text-sm text-muted-foreground">Receive updates via email</p>
                       </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <Input type="checkbox" defaultChecked className="w-4 h-4" />
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">Deadline Reminders</p>
                         <p className="text-sm text-muted-foreground">Get notified about upcoming deadlines</p>
                       </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <Input type="checkbox" defaultChecked className="w-4 h-4" />
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">Case Updates</p>
                         <p className="text-sm text-muted-foreground">Receive notifications about case status changes</p>
                       </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <Input type="checkbox" defaultChecked className="w-4 h-4" />
                     </div>
                     <div className="flex justify-end">
-                      <Button className="bg-law-teal hover:bg-law-teal/90">Save Preferences</Button>
+                      <Button 
+                        className="bg-law-teal hover:bg-law-teal/90"
+                        onClick={() => toast.success("Notification preferences updated")}
+                      >
+                        Save Preferences
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -156,22 +289,19 @@ export default function Settings() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Change Password</label>
+                      <Label>Change Password</Label>
                       <div className="grid gap-2">
-                        <input 
+                        <Input 
                           type="password" 
                           placeholder="Current password" 
-                          className="w-full p-2 border rounded-md" 
                         />
-                        <input 
+                        <Input 
                           type="password" 
                           placeholder="New password" 
-                          className="w-full p-2 border rounded-md" 
                         />
-                        <input 
+                        <Input 
                           type="password" 
                           placeholder="Confirm new password" 
-                          className="w-full p-2 border rounded-md" 
                         />
                       </div>
                     </div>
@@ -180,10 +310,20 @@ export default function Settings() {
                         <p className="font-medium">Two-Factor Authentication</p>
                         <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
                       </div>
-                      <Button variant="outline">Enable</Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => toast.info("2FA setup would launch here")}
+                      >
+                        Enable
+                      </Button>
                     </div>
                     <div className="flex justify-end">
-                      <Button className="bg-law-teal hover:bg-law-teal/90">Update Security</Button>
+                      <Button 
+                        className="bg-law-teal hover:bg-law-teal/90"
+                        onClick={() => toast.success("Security settings updated")}
+                      >
+                        Update Security
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
