@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,21 +35,21 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, on
   const [isLoading, setIsLoading] = useState(false);
   
   // Property fields
-  const [street, setStreet] = useState(data?.property?.street || '');
-  const [city, setCity] = useState(data?.property?.city || '');
-  const [province, setProvince] = useState(data?.property?.province || 'BC');
-  const [postalCode, setPostalCode] = useState(data?.property?.postal_code || '');
-  const [propertyType, setPropertyType] = useState(data?.property?.property_type || 'Residential');
-  const [legalDescription, setLegalDescription] = useState(data?.property?.legal_description || '');
+  const [street, setStreet] = useState(data?.property?.address?.street || '');
+  const [city, setCity] = useState(data?.property?.address?.city || '');
+  const [province, setProvince] = useState(data?.property?.address?.province || 'BC');
+  const [postalCode, setPostalCode] = useState(data?.property?.address?.postalCode || '');
+  const [propertyType, setPropertyType] = useState(data?.property?.propertyType || 'Residential');
+  const [legalDescription, setLegalDescription] = useState(data?.property?.legalDescription || '');
   const [pid, setPid] = useState(data?.property?.pid || '');
   
   // Mortgage fields
-  const [registrationNumber, setRegistrationNumber] = useState(data?.mortgage?.registration_number || '');
+  const [registrationNumber, setRegistrationNumber] = useState(data?.mortgage?.registrationNumber || '');
   const [principal, setPrincipal] = useState(data?.mortgage?.principal?.toString() || '');
-  const [interestRate, setInterestRate] = useState(data?.mortgage?.interest_rate?.toString() || '');
-  const [startDate, setStartDate] = useState(data?.mortgage?.start_date || '');
-  const [currentBalance, setCurrentBalance] = useState(data?.mortgage?.current_balance?.toString() || '');
-  const [perDiemInterest, setPerDiemInterest] = useState(data?.mortgage?.per_diem_interest?.toString() || '');
+  const [interestRate, setInterestRate] = useState(data?.mortgage?.interestRate?.toString() || '');
+  const [startDate, setStartDate] = useState(data?.mortgage?.startDate || '');
+  const [currentBalance, setCurrentBalance] = useState(data?.mortgage?.currentBalance?.toString() || '');
+  const [perDiemInterest, setPerDiemInterest] = useState(data?.mortgage?.perDiemInterest?.toString() || '');
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
