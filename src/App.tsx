@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Calendar from "./pages/Calendar";
 import Clients from "./pages/Clients";
 import CaseDetail from "./pages/CaseDetail";
+import NewCase from "./pages/NewCase";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/cases" element={<Index />} />
           <Route path="/case/:id" element={<CaseDetail />} />
+          <Route path="/new-case" element={<NewCase />} />
           <Route path="/documents" element={<Index />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/clients" element={<Clients />} />
