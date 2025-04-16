@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,24 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Legal-themed custom colors
+				law: {
+					navy: '#1a365d',
+					slate: '#4a5568',
+					teal: '#319795',
+					amber: '#d69e2e',
+					light: '#e2e8f0',
+					lightest: '#f7fafc'
+				},
+				case: {
+					new: '#4299e1',         // Blue
+					demand: '#d69e2e',      // Amber
+					petition: '#805ad5',    // Purple
+					ordernisi: '#38b2ac',   // Teal
+					redemption: '#ed8936',  // Orange
+					sale: '#667eea',        // Indigo
+					closed: '#48bb78'       // Green
 				}
 			},
 			borderRadius: {
@@ -84,11 +103,20 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'fade-in': {
+					'0%': {
+						opacity: '0'
+					},
+					'100%': {
+						opacity: '1'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fade-in 0.3s ease-out'
 			}
 		}
 	},
