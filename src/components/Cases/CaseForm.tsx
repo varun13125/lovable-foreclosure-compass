@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,10 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, on
   const [city, setCity] = useState(data?.property?.address?.city || '');
   const [province, setProvince] = useState(data?.property?.address?.province || 'BC');
   const [postalCode, setPostalCode] = useState(data?.property?.address?.postalCode || '');
-  const [propertyType, setPropertyType] = useState(data?.property?.propertyType || 'Residential');
+  // Define propertyType with the correct type to match our Property type
+  const [propertyType, setPropertyType] = useState<'Residential' | 'Commercial' | 'Land' | 'Other'>(
+    (data?.property?.propertyType as 'Residential' | 'Commercial' | 'Land' | 'Other') || 'Residential'
+  );
   const [legalDescription, setLegalDescription] = useState(data?.property?.legalDescription || '');
   const [pid, setPid] = useState(data?.property?.pid || '');
   
@@ -51,6 +55,11 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, on
   const [currentBalance, setCurrentBalance] = useState(data?.mortgage?.currentBalance?.toString() || '');
   const [perDiemInterest, setPerDiemInterest] = useState(data?.mortgage?.perDiemInterest?.toString() || '');
   
+  // This function explicitly casts the input string to our PropertyType union type
+  const handlePropertyTypeChange = (value: string) => {
+    setPropertyType(value as 'Residential' | 'Commercial' | 'Land' | 'Other');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -259,7 +268,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, on
             <Label htmlFor="propertyType">Property Type</Label>
             <Select 
               value={propertyType} 
-              onValueChange={setPropertyType}
+              onValueChange={handlePropertyTypeChange}
               disabled={isLoading}
             >
               <SelectTrigger>
