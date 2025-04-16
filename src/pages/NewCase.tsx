@@ -47,8 +47,8 @@ export default function NewCase() {
 
           <CaseForm 
             onCancel={handleCancelClick}
-            onSubmitSuccess={handleSuccess}
-            onSubmitError={handleError}
+            onSuccess={handleSuccess}
+            onError={handleError}
           />
         </main>
       </div>

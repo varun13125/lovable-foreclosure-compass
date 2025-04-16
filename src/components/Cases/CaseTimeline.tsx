@@ -70,10 +70,21 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
         throw error;
       }
       
-      setDocuments(data || []);
+      // Transform the data to match the Document type
+      const transformedDocs: Document[] = (data || []).map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        createdAt: doc.created_at,
+        status: doc.status,
+        caseId: doc.case_id,
+        url: doc.url || undefined
+      }));
+      
+      setDocuments(transformedDocs);
       
       // Now construct timeline events
-      buildTimelineEvents(data || []);
+      buildTimelineEvents(transformedDocs);
     } catch (error) {
       console.error("Error fetching documents:", error);
     } finally {
@@ -81,7 +92,7 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
     }
   };
   
-  const buildTimelineEvents = (docs: any[]) => {
+  const buildTimelineEvents = (docs: Document[]) => {
     if (!caseData) return;
     
     // Create timeline events from case data
@@ -98,7 +109,7 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
     if (docs.length > 0) {
       docs.forEach(doc => {
         events.push({
-          date: doc.created_at,
+          date: doc.createdAt,
           title: `Document: ${doc.title}`,
           description: `${doc.type} - ${doc.status}`,
           status: doc.status === "Finalized" ? "completed" : "in-progress"

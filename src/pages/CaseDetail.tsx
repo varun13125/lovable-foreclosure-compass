@@ -3,12 +3,13 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { 
   ArrowLeft, Calendar, FileText, ClipboardList, 
-  DollarSign, MessageSquare, Clock, AlertTriangle 
+  DollarSign, MessageSquare, Clock, AlertTriangle, Edit, Plus, Save, X 
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Table,
@@ -23,13 +24,15 @@ import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import DocumentGenerator from "@/components/Documents/DocumentGenerator";
 import { getStatusColor } from "@/data/mockData";
-import { Case, Deadline } from "@/types";
+import { Case, Deadline, Party } from "@/types";
 import CaseTimeline from "@/components/Cases/CaseTimeline";
 import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
 import CaseParties from "@/components/Cases/CaseParties";
 import CaseForm from "@/components/Cases/CaseForm";
 import { supabase } from "@/integrations/supabase/client";
+import AddDeadlineDialog from "@/components/Cases/AddDeadlineDialog";
+import AddPartyDialog from "@/components/Cases/AddPartyDialog";
 
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +40,14 @@ export default function CaseDetail() {
   const isEditMode = searchParams.get('edit') === 'true';
   const [activeCase, setActiveCase] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const [notes, setNotes] = useState<string>("");
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [addDeadlineOpen, setAddDeadlineOpen] = useState(false);
+  const [addPartyOpen, setAddPartyOpen] = useState(false);
+  
+  // For financials section visibility
+  const [financeLoading, setFinanceLoading] = useState(false);
+  
   useEffect(() => {
     if (id) {
       fetchCase(id);
@@ -154,9 +164,9 @@ export default function CaseDetail() {
           title: deadline.title,
           description: deadline.description || '',
           date: deadline.date,
-          type: deadline.type,
+          type: deadline.type || 'Internal',
           complete: deadline.complete,
-          caseId: caseId // Add the caseId that's required by the type definition
+          caseId: caseId
         })),
         court: {
           fileNumber: data.court_file_number || '',
@@ -168,6 +178,7 @@ export default function CaseDetail() {
       };
 
       setActiveCase(transformedCase);
+      setNotes(transformedCase.notes || '');
     } catch (error) {
       console.error("Error fetching case:", error);
       toast.error("Failed to load case details", {
@@ -175,6 +186,31 @@ export default function CaseDetail() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveNotes = async () => {
+    if (!activeCase) return;
+    
+    try {
+      const { error } = await supabase
+        .from('cases')
+        .update({ notes: notes })
+        .eq('id', activeCase.id);
+        
+      if (error) throw error;
+      
+      toast.success("Notes updated successfully");
+      setIsEditingNotes(false);
+      
+      // Update the local state
+      setActiveCase({
+        ...activeCase,
+        notes: notes
+      });
+    } catch (error) {
+      console.error("Error updating notes:", error);
+      toast.error("Failed to update notes");
     }
   };
 
@@ -246,15 +282,15 @@ export default function CaseDetail() {
               <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
             </div>
             <CaseForm 
-              initialData={activeCase}
+              caseData={activeCase}
               onCancel={() => {
                 window.location.href = `/case/${id}`;
               }}
-              onSubmitSuccess={(updatedCaseId) => {
+              onSuccess={(updatedCaseId) => {
                 toast.success("Case updated successfully");
                 window.location.href = `/case/${updatedCaseId}`;
               }}
-              onSubmitError={(errorMessage) => {
+              onError={(errorMessage) => {
                 toast.error("Failed to update case", {
                   description: errorMessage || "Please try again."
                 });
@@ -274,6 +310,7 @@ export default function CaseDetail() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-CA', {
       year: 'numeric',
@@ -311,7 +348,7 @@ export default function CaseDetail() {
             <div className="mt-4 md:mt-0 flex gap-2">
               <Button variant="outline" className="gap-2" asChild>
                 <Link to={`/case/${activeCase.id}?edit=true`}>
-                  <Clock className="h-4 w-4" />
+                  <Edit className="h-4 w-4" />
                   Edit Case
                 </Link>
               </Button>
@@ -450,12 +487,38 @@ export default function CaseDetail() {
                   <CaseTimeline caseId={activeCase.id} />
                 </div>
                 <div className="col-span-1">
-                  <CaseDeadlines caseId={activeCase.id} limit={5} />
+                  <Card className="shadow-sm h-full">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        Upcoming Deadlines
+                      </CardTitle>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs"
+                        onClick={() => setAddDeadlineOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <CaseDeadlines caseId={activeCase.id} limit={5} />
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </TabsContent>
             
             <TabsContent value="parties">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">Case Parties</h2>
+                <Button className="gap-2" onClick={() => setAddPartyOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Add Party
+                </Button>
+              </div>
               <CaseParties caseId={activeCase.id} />
             </TabsContent>
             
@@ -471,6 +534,13 @@ export default function CaseDetail() {
             </TabsContent>
             
             <TabsContent value="deadlines">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">All Deadlines</h2>
+                <Button className="gap-2" onClick={() => setAddDeadlineOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Add Deadline
+                </Button>
+              </div>
               <CaseDeadlines caseId={activeCase.id} />
             </TabsContent>
             
@@ -480,22 +550,67 @@ export default function CaseDetail() {
             
             <TabsContent value="notes">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Case Notes</CardTitle>
+                  {!isEditingNotes ? (
+                    <Button size="sm" variant="outline" onClick={() => setIsEditingNotes(true)}>
+                      <Edit className="h-4 w-4 mr-2" /> Edit Notes
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={saveNotes}>
+                        <Save className="h-4 w-4 mr-2" /> Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setNotes(activeCase.notes || '');
+                        setIsEditingNotes(false);
+                      }}>
+                        <X className="h-4 w-4 mr-2" /> Cancel
+                      </Button>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <div className="border rounded-lg p-4 min-h-[300px]">
-                    {activeCase.notes || "No notes have been added to this case."}
-                  </div>
-                  <div className="mt-4 flex justify-end">
-                    <Button>Edit Notes</Button>
-                  </div>
+                  {isEditingNotes ? (
+                    <Textarea 
+                      value={notes} 
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="min-h-[300px] w-full"
+                      placeholder="Enter case notes here..."
+                    />
+                  ) : (
+                    <div className="border rounded-lg p-4 min-h-[300px] whitespace-pre-wrap">
+                      {activeCase.notes || "No notes have been added to this case."}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </main>
       </div>
+      
+      {/* Add Deadline Dialog */}
+      <AddDeadlineDialog 
+        open={addDeadlineOpen} 
+        onOpenChange={setAddDeadlineOpen} 
+        caseId={activeCase.id} 
+        onSuccess={() => {
+          fetchCase(activeCase.id);
+          toast.success("Deadline added successfully");
+        }}
+      />
+      
+      {/* Add Party Dialog */}
+      <AddPartyDialog 
+        open={addPartyOpen} 
+        onOpenChange={setAddPartyOpen} 
+        caseId={activeCase.id}
+        onSuccess={() => {
+          fetchCase(activeCase.id);
+          toast.success("Party added successfully");
+        }}
+      />
     </div>
   );
 }

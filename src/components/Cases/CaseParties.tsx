@@ -11,9 +11,10 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Mail, Phone, MapPin, Edit } from "lucide-react";
+import { Plus, Mail, Phone, MapPin, Edit, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Party } from "@/types";
+import EditPartyDialog from "./EditPartyDialog";
 
 interface CasePartiesProps {
   caseId: string;
@@ -22,6 +23,8 @@ interface CasePartiesProps {
 export default function CaseParties({ caseId }: CasePartiesProps) {
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editParty, setEditParty] = useState<Party | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   useEffect(() => {
     fetchParties();
@@ -92,6 +95,17 @@ export default function CaseParties({ caseId }: CasePartiesProps) {
     Lawyer: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
     Client: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300"
   };
+  
+  const handleEditParty = (party: Party) => {
+    setEditParty(party);
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleEditSuccess = () => {
+    fetchParties();
+    setIsEditDialogOpen(false);
+    setEditParty(null);
+  };
 
   if (loading) {
     return (
@@ -102,15 +116,7 @@ export default function CaseParties({ caseId }: CasePartiesProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Case Parties</h2>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Party
-        </Button>
-      </div>
-      
+    <div className="space-y-6">      
       {parties.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="flex flex-col items-center justify-center py-10">
@@ -142,7 +148,12 @@ export default function CaseParties({ caseId }: CasePartiesProps) {
                             {party.type}
                           </Badge>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleEditParty(party)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                       </div>
@@ -182,6 +193,15 @@ export default function CaseParties({ caseId }: CasePartiesProps) {
             </Card>
           )
         )
+      )}
+      
+      {editParty && (
+        <EditPartyDialog 
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          party={editParty}
+          onSuccess={handleEditSuccess}
+        />
       )}
     </div>
   );
