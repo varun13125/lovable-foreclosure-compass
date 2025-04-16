@@ -31,14 +31,14 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
       
       // Create download link
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = window.document.createElement("a");
       a.href = url;
       a.download = `${document.title}.txt`;
-      document.body.appendChild(a);
+      window.document.body.appendChild(a);
       a.click();
       
       // Clean up
-      document.body.removeChild(a);
+      window.document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
       toast.success(`${document.title} downloaded successfully`);

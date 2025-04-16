@@ -1,4 +1,3 @@
-
 export type CaseStatus = 
   | 'New' 
   | 'Demand Letter Sent' 
@@ -59,11 +58,12 @@ export interface Deadline {
 export interface Document {
   id: string;
   title: string;
-  type: 'Demand Letter' | 'Petition' | 'Affidavit' | 'Order Nisi' | 'Conduct of Sale' | 'Final Order' | 'Other';
-  createdAt: string; // ISO date string
-  status: 'Draft' | 'Finalized' | 'Filed' | 'Served';
+  type: "Demand Letter" | "Petition" | "Order Nisi" | "Conduct of Sale" | "Other";
+  createdAt: string;
+  status: "Draft" | "Finalized";
   caseId: string;
   url?: string;
+  caseNumber?: string; // Add this property to fix errors
 }
 
 export interface Case {
