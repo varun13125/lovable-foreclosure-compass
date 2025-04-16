@@ -54,7 +54,7 @@ export default function NewCase() {
           
           <CaseForm 
             onCancel={handleCancel} 
-            onSuccess={handleSubmit}
+            onSubmit={handleSubmit}
             onError={handleError}
             isLoading={loading}
             setIsLoading={setLoading}

@@ -11,6 +11,10 @@ import CaseDetail from "./pages/CaseDetail";
 import NewCase from "./pages/NewCase";
 import NotFound from "./pages/NotFound";
 import Cases from "./pages/Cases";
+import Documents from "./pages/Documents";
+import Messages from "./pages/Messages";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -25,12 +29,12 @@ const App = () => (
           <Route path="/cases" element={<Cases />} />
           <Route path="/case/:id" element={<CaseDetail />} />
           <Route path="/new-case" element={<NewCase />} />
-          <Route path="/documents" element={<Index />} />
+          <Route path="/documents" element={<Documents />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/clients" element={<Clients />} />
-          <Route path="/messages" element={<Index />} />
-          <Route path="/reports" element={<Index />} />
-          <Route path="/settings" element={<Index />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

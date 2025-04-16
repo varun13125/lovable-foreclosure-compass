@@ -1,4 +1,5 @@
 
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,16 +39,19 @@ const Index = () => {
     {
       title: "Create New Case",
       icon: Grid,
+      href: "/new-case",
       description: "Start a new foreclosure case"
     },
     {
       title: "Generate Document",
       icon: Clock,
+      href: "/documents",
       description: "Create legal documents from templates"
     },
     {
       title: "Check Deadlines",
       icon: AlertTriangle,
+      href: "/calendar",
       description: "View upcoming case deadlines"
     }
   ];
@@ -64,7 +68,9 @@ const Index = () => {
               <p className="text-muted-foreground">Welcome back to ForeLaw</p>
             </div>
             <div className="mt-4 md:mt-0">
-              <Button className="bg-law-teal hover:bg-law-teal/90">Create New Case</Button>
+              <Button className="bg-law-teal hover:bg-law-teal/90" asChild>
+                <Link to="/new-case">Create New Case</Link>
+              </Button>
             </div>
           </div>
 
@@ -88,18 +94,21 @@ const Index = () => {
                           key={index}
                           variant="outline"
                           className="w-full justify-start h-auto py-3"
+                          asChild
                         >
-                          <div className="flex items-start">
-                            <div className="mr-3 mt-1">
-                              <action.icon className="h-5 w-5 text-law-teal" />
-                            </div>
-                            <div className="text-left">
-                              <div className="font-medium">{action.title}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {action.description}
+                          <Link to={action.href}>
+                            <div className="flex items-start">
+                              <div className="mr-3 mt-1">
+                                <action.icon className="h-5 w-5 text-law-teal" />
+                              </div>
+                              <div className="text-left">
+                                <div className="font-medium">{action.title}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {action.description}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          </Link>
                         </Button>
                       ))}
                     </div>
@@ -127,8 +136,8 @@ const Index = () => {
                               <div className="text-xs text-muted-foreground">{deadline.date}</div>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" className="h-8">
-                            View
+                          <Button variant="ghost" size="sm" className="h-8" asChild>
+                            <Link to="/calendar">View</Link>
                           </Button>
                         </div>
                       ))}
@@ -157,6 +166,6 @@ const Index = () => {
       </div>
     </div>
   );
-};
+}
 
 export default Index;

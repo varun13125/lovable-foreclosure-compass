@@ -58,24 +58,24 @@ export default function CaseListTable({ cases, loading, formatCurrency }: CaseLi
       </TableHeader>
       <TableBody>
         {cases.map((caseItem) => (
-          <TableRow key={caseItem.id} className="cursor-pointer hover:bg-muted/50">
+          <TableRow key={caseItem.id} className="hover:bg-muted/50">
             <TableCell className="font-medium">
               <Link to={`/case/${caseItem.id}`} className="hover:underline text-law-navy">
                 {caseItem.fileNumber}
               </Link>
             </TableCell>
             <TableCell>
-              {caseItem.property.address.street}, {caseItem.property.address.city}
+              {caseItem.property?.address?.street}, {caseItem.property?.address?.city}
             </TableCell>
             <TableCell>
-              {caseItem.parties.find((p) => p.type === "Borrower")?.name || "N/A"}
+              {caseItem.parties?.find((p) => p.type === "Borrower")?.name || "N/A"}
             </TableCell>
             <TableCell>
               <Badge className={`${getStatusColor(caseItem.status)} hover:bg-opacity-80`}>
                 {caseItem.status}
               </Badge>
             </TableCell>
-            <TableCell>{formatCurrency(caseItem.mortgage.currentBalance)}</TableCell>
+            <TableCell>{formatCurrency(caseItem.mortgage?.currentBalance || 0)}</TableCell>
             <TableCell>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -100,7 +100,7 @@ export default function CaseListTable({ cases, loading, formatCurrency }: CaseLi
                     asChild 
                     className="cursor-pointer"
                   >
-                    <Link to={`/case/${caseItem.id}`}>
+                    <Link to={`/case/${caseItem.id}?edit=true`}>
                       <FileEdit className="mr-2 h-4 w-4" /> Edit Case
                     </Link>
                   </DropdownMenuItem>
