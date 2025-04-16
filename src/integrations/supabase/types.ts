@@ -9,7 +9,351 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          action: string
+          case_id: string
+          details: string | null
+          id: string
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          case_id: string
+          details?: string | null
+          id?: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          case_id?: string
+          details?: string | null
+          id?: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      case_parties: {
+        Row: {
+          case_id: string
+          created_at: string
+          id: string
+          party_id: string
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          id?: string
+          party_id: string
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          id?: string
+          party_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "case_parties_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "case_parties_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cases: {
+        Row: {
+          court_file_number: string | null
+          court_registry: string | null
+          created_at: string
+          file_number: string
+          hearing_date: string | null
+          id: string
+          judge_name: string | null
+          mortgage_id: string
+          notes: string | null
+          property_id: string
+          status: Database["public"]["Enums"]["case_status"]
+          updated_at: string
+        }
+        Insert: {
+          court_file_number?: string | null
+          court_registry?: string | null
+          created_at?: string
+          file_number: string
+          hearing_date?: string | null
+          id?: string
+          judge_name?: string | null
+          mortgage_id: string
+          notes?: string | null
+          property_id: string
+          status?: Database["public"]["Enums"]["case_status"]
+          updated_at?: string
+        }
+        Update: {
+          court_file_number?: string | null
+          court_registry?: string | null
+          created_at?: string
+          file_number?: string
+          hearing_date?: string | null
+          id?: string
+          judge_name?: string | null
+          mortgage_id?: string
+          notes?: string | null
+          property_id?: string
+          status?: Database["public"]["Enums"]["case_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cases_mortgage_id_fkey"
+            columns: ["mortgage_id"]
+            isOneToOne: false
+            referencedRelation: "mortgages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deadlines: {
+        Row: {
+          case_id: string
+          complete: boolean
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          title: string
+          type: Database["public"]["Enums"]["deadline_type"]
+          updated_at: string
+        }
+        Insert: {
+          case_id: string
+          complete?: boolean
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          title: string
+          type: Database["public"]["Enums"]["deadline_type"]
+          updated_at?: string
+        }
+        Update: {
+          case_id?: string
+          complete?: boolean
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          title?: string
+          type?: Database["public"]["Enums"]["deadline_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deadlines_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          case_id: string
+          content: string | null
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["document_status"]
+          title: string
+          type: Database["public"]["Enums"]["document_type"]
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          case_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["document_status"]
+          title: string
+          type: Database["public"]["Enums"]["document_type"]
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          case_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["document_status"]
+          title?: string
+          type?: Database["public"]["Enums"]["document_type"]
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mortgages: {
+        Row: {
+          arrears: number | null
+          created_at: string
+          current_balance: number
+          id: string
+          interest_rate: number
+          payment_amount: number | null
+          payment_frequency:
+            | Database["public"]["Enums"]["payment_frequency"]
+            | null
+          per_diem_interest: number
+          principal: number
+          registration_number: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          arrears?: number | null
+          created_at?: string
+          current_balance: number
+          id?: string
+          interest_rate: number
+          payment_amount?: number | null
+          payment_frequency?:
+            | Database["public"]["Enums"]["payment_frequency"]
+            | null
+          per_diem_interest: number
+          principal: number
+          registration_number: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          arrears?: number | null
+          created_at?: string
+          current_balance?: number
+          id?: string
+          interest_rate?: number
+          payment_amount?: number | null
+          payment_frequency?:
+            | Database["public"]["Enums"]["payment_frequency"]
+            | null
+          per_diem_interest?: number
+          principal?: number
+          registration_number?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      parties: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          type: Database["public"]["Enums"]["party_type"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          type: Database["public"]["Enums"]["party_type"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          type?: Database["public"]["Enums"]["party_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          city: string
+          created_at: string
+          estimated_value: number | null
+          id: string
+          legal_description: string | null
+          pid: string | null
+          postal_code: string | null
+          property_type: Database["public"]["Enums"]["property_type"]
+          province: string
+          street: string
+          updated_at: string
+        }
+        Insert: {
+          city: string
+          created_at?: string
+          estimated_value?: number | null
+          id?: string
+          legal_description?: string | null
+          pid?: string | null
+          postal_code?: string | null
+          property_type?: Database["public"]["Enums"]["property_type"]
+          province?: string
+          street: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          estimated_value?: number | null
+          id?: string
+          legal_description?: string | null
+          pid?: string | null
+          postal_code?: string | null
+          property_type?: Database["public"]["Enums"]["property_type"]
+          province?: string
+          street?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +362,27 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      case_status:
+        | "New"
+        | "Demand Letter Sent"
+        | "Petition Filed"
+        | "Order Nisi Granted"
+        | "Redemption Period"
+        | "Sale Process"
+        | "Closed"
+      deadline_type: "Statutory" | "Court" | "Internal" | "Client"
+      document_status: "Draft" | "Finalized" | "Filed" | "Served"
+      document_type:
+        | "Demand Letter"
+        | "Petition"
+        | "Affidavit"
+        | "Order Nisi"
+        | "Conduct of Sale"
+        | "Final Order"
+        | "Other"
+      party_type: "Borrower" | "Lender" | "ThirdParty" | "Lawyer" | "Client"
+      payment_frequency: "Monthly" | "Bi-weekly" | "Weekly"
+      property_type: "Residential" | "Commercial" | "Land" | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +497,30 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      case_status: [
+        "New",
+        "Demand Letter Sent",
+        "Petition Filed",
+        "Order Nisi Granted",
+        "Redemption Period",
+        "Sale Process",
+        "Closed",
+      ],
+      deadline_type: ["Statutory", "Court", "Internal", "Client"],
+      document_status: ["Draft", "Finalized", "Filed", "Served"],
+      document_type: [
+        "Demand Letter",
+        "Petition",
+        "Affidavit",
+        "Order Nisi",
+        "Conduct of Sale",
+        "Final Order",
+        "Other",
+      ],
+      party_type: ["Borrower", "Lender", "ThirdParty", "Lawyer", "Client"],
+      payment_frequency: ["Monthly", "Bi-weekly", "Weekly"],
+      property_type: ["Residential", "Commercial", "Land", "Other"],
+    },
   },
 } as const

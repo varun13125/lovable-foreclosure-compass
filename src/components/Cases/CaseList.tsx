@@ -1,6 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,14 +21,89 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Search, Filter, Plus, MoreHorizontal, Eye, FileEdit } from "lucide-react";
-import { mockCases, getStatusColor } from "@/data/mockData";
+import { getStatusColor } from "@/data/mockData";
 import { Case } from "@/types";
+import { toast } from "@/components/ui/sonner";
 
 export default function CaseList() {
+  const [cases, setCases] = useState<Case[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const filteredCases = mockCases.filter((caseItem) => {
+  useEffect(() => {
+    fetchCases();
+  }, []);
+
+  const fetchCases = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('cases')
+        .select(`
+          id,
+          file_number,
+          status,
+          property: properties (
+            address: street,
+            city
+          ),
+          parties: case_parties (
+            party: parties (
+              name,
+              type
+            )
+          ),
+          mortgage: mortgages (
+            current_balance
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform the data to match the Case type
+      const transformedCases = data.map(caseItem => ({
+        id: caseItem.id,
+        fileNumber: caseItem.file_number,
+        status: caseItem.status,
+        property: {
+          address: {
+            street: caseItem.property.address,
+            city: caseItem.property.city,
+            province: '', // Not included in this query
+            postalCode: '' // Not included in this query
+          }
+        },
+        parties: caseItem.parties.map(cp => ({
+          id: cp.party.id,
+          name: cp.party.name,
+          type: cp.party.type,
+          contactInfo: {}
+        })),
+        mortgage: {
+          currentBalance: caseItem.mortgage.current_balance,
+          id: '', // Not included in this query
+          registrationNumber: '',
+          principal: 0,
+          interestRate: 0,
+          startDate: '',
+          currentBalance: caseItem.mortgage.current_balance
+        }
+      }));
+
+      setCases(transformedCases);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      toast.error("Failed to load cases", {
+        description: "Please try again later."
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredCases = cases.filter((caseItem) => {
     // Apply search filter
     const matchesSearch =
       searchQuery === "" ||
@@ -44,7 +120,7 @@ export default function CaseList() {
   });
 
   // Get all unique statuses for the filter
-  const statuses = Array.from(new Set(mockCases.map((caseItem) => caseItem.status)));
+  const statuses = Array.from(new Set(cases.map((caseItem) => caseItem.status)));
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-CA', {
@@ -54,9 +130,21 @@ export default function CaseList() {
   };
 
   const handleNewCase = () => {
-    // This would navigate to the case creation form in a real application
-    console.log("Create new case clicked");
+    // Navigate to case creation form
+    toast.info("Create New Case", {
+      description: "Case creation feature coming soon!"
+    });
   };
+
+  if (loading) {
+    return (
+      <Card className="shadow-sm">
+        <CardContent className="flex justify-center items-center h-64">
+          Loading cases...
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-sm">
