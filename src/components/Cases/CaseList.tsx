@@ -44,17 +44,28 @@ export default function CaseList() {
           id,
           file_number,
           status,
+          created_at,
+          updated_at,
           property: properties (
+            id,
             address: street,
-            city
+            city,
+            province,
+            postal_code
           ),
           parties: case_parties (
             party: parties (
+              id,
               name,
               type
             )
           ),
           mortgage: mortgages (
+            id,
+            registration_number,
+            principal,
+            interest_rate,
+            start_date,
             current_balance
           )
         `)
@@ -67,29 +78,40 @@ export default function CaseList() {
         id: caseItem.id,
         fileNumber: caseItem.file_number,
         status: caseItem.status,
+        createdAt: caseItem.created_at,
+        updatedAt: caseItem.updated_at,
         property: {
+          id: caseItem.property.id,
           address: {
             street: caseItem.property.address,
             city: caseItem.property.city,
-            province: '', // Not included in this query
-            postalCode: '' // Not included in this query
-          }
+            province: caseItem.property.province || '',
+            postalCode: caseItem.property.postal_code || ''
+          },
+          pid: '',
+          legalDescription: '',
+          propertyType: 'Residential'
         },
         parties: caseItem.parties.map(cp => ({
           id: cp.party.id,
           name: cp.party.name,
           type: cp.party.type,
-          contactInfo: {}
+          contactInfo: {
+            email: '',
+            phone: ''
+          }
         })),
         mortgage: {
+          id: caseItem.mortgage.id,
+          registrationNumber: caseItem.mortgage.registration_number,
+          principal: caseItem.mortgage.principal,
+          interestRate: caseItem.mortgage.interest_rate,
+          startDate: caseItem.mortgage.start_date,
           currentBalance: caseItem.mortgage.current_balance,
-          id: '', // Not included in this query
-          registrationNumber: '',
-          principal: 0,
-          interestRate: 0,
-          startDate: '',
-          currentBalance: caseItem.mortgage.current_balance
-        }
+          perDiemInterest: 0
+        },
+        deadlines: [],
+        documents: []
       }));
 
       setCases(transformedCases);
