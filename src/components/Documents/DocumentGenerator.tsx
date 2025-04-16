@@ -286,7 +286,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
             postalCode: caseData.property.postal_code || ''
           },
           pid: caseData.property.pid || '',
-          legalDescription: caseData.property.legalDescription || '',
+          legalDescription: caseData.property.legal_description || '',
           propertyType: caseData.property.property_type
         },
         mortgage: {
@@ -296,7 +296,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
           interestRate: caseData.mortgage.interest_rate,
           startDate: caseData.mortgage.start_date,
           currentBalance: caseData.mortgage.current_balance,
-          perDiemInterest: caseData.mortgage.perDiemInterest,
+          perDiemInterest: caseData.mortgage.per_diem_interest,
           arrears: caseData.mortgage.arrears
         },
         parties: parties,
@@ -920,31 +920,4 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
                   >
                     <div className="flex items-center gap-2">
                       <FileCheck className="h-4 w-4 text-law-teal" />
-                      <span className="text-sm">{doc.title}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{doc.status}</Badge>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0"
-                        onClick={() => handlePrintDocument(doc.id)}
-                      >
-                        <Printer className="h-4 w-4" />
-                        <span className="sr-only">Print</span>
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="p-2 text-sm text-muted-foreground">
-                  No recent documents
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+                      <span className="text-sm">{doc.
