@@ -133,7 +133,20 @@ export default function CaseForm({ onCancel }: CaseFormProps) {
           .eq('type', 'Borrower');
           
         if (borrowersError) throw borrowersError;
-        setExistingBorrowers(borrowers as Party[]);
+        
+        // Transform database structure to match Party interface
+        const transformedBorrowers: Party[] = borrowers.map(borrower => ({
+          id: borrower.id,
+          name: borrower.name,
+          type: borrower.type,
+          contactInfo: {
+            email: borrower.email || '',
+            phone: borrower.phone || '',
+            address: borrower.address || '',
+          }
+        }));
+        
+        setExistingBorrowers(transformedBorrowers);
         
         // Fetch lenders
         const { data: lenders, error: lendersError } = await supabase
@@ -142,7 +155,20 @@ export default function CaseForm({ onCancel }: CaseFormProps) {
           .eq('type', 'Lender');
           
         if (lendersError) throw lendersError;
-        setExistingLenders(lenders as Party[]);
+        
+        // Transform database structure to match Party interface
+        const transformedLenders: Party[] = lenders.map(lender => ({
+          id: lender.id,
+          name: lender.name,
+          type: lender.type,
+          contactInfo: {
+            email: lender.email || '',
+            phone: lender.phone || '',
+            address: lender.address || '',
+          }
+        }));
+        
+        setExistingLenders(transformedLenders);
       } catch (error) {
         console.error('Error fetching parties:', error);
         toast.error("Failed to load existing clients");
