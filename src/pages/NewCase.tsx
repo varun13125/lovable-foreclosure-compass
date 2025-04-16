@@ -1,32 +1,32 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import CaseForm from "@/components/Cases/CaseForm";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import CaseForm from "@/components/Cases/CaseForm";
 import { toast } from "sonner";
 
 export default function NewCase() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCancel = () => {
-    navigate('/cases');
+  const handleCancelClick = () => {
+    navigate("/cases");
   };
 
-  const handleSubmit = async (caseId: string) => {
-    setLoading(false);
-    toast.success("Case created successfully");
+  const handleSuccess = (caseId: string) => {
+    toast.success("Case created successfully", {
+      description: "The new case has been created.",
+    });
     navigate(`/case/${caseId}`);
   };
-
+  
   const handleError = (errorMessage: string) => {
-    setError(errorMessage);
-    setLoading(false);
-    toast.error("Failed to create case");
+    toast.error("Failed to create case", {
+      description: errorMessage || "Please try again.",
+    });
   };
 
   return (
@@ -35,29 +35,20 @@ export default function NewCase() {
       <div className="md:pl-64">
         <Header />
         <main className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Create New Case</h1>
-              <p className="text-muted-foreground">Enter details for the new foreclosure case</p>
-            </div>
+          <div className="flex items-center mb-6">
+            <Button variant="outline" size="sm" asChild className="mr-4">
+              <Link to="/cases">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Cases
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-bold">Create New Case</h1>
           </div>
-          
-          {error && (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                {error}
-              </AlertDescription>
-            </Alert>
-          )}
-          
+
           <CaseForm 
-            onCancel={handleCancel} 
-            onSubmit={handleSubmit}
+            onCancel={handleCancelClick}
+            onSuccess={handleSuccess}
             onError={handleError}
-            isLoading={loading}
-            setIsLoading={setLoading}
           />
         </main>
       </div>

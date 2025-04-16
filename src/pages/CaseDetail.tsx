@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { 
   ArrowLeft, Calendar, FileText, ClipboardList, 
   DollarSign, MessageSquare, Clock, AlertTriangle 
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -21,18 +22,185 @@ import {
 import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import DocumentGenerator from "@/components/Documents/DocumentGenerator";
-import { mockCases, getStatusColor } from "@/data/mockData";
+import { getStatusColor } from "@/data/mockData";
 import { Case } from "@/types";
 import CaseTimeline from "@/components/Cases/CaseTimeline";
 import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
 import CaseParties from "@/components/Cases/CaseParties";
+import CaseForm from "@/components/Cases/CaseForm";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
-  const [activeCase, setActiveCase] = useState<Case | undefined>(
-    mockCases.find((c) => c.id === id)
-  );
+  const [searchParams] = useSearchParams();
+  const isEditMode = searchParams.get('edit') === 'true';
+  const [activeCase, setActiveCase] = useState<Case | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (id) {
+      fetchCase(id);
+    }
+  }, [id]);
+
+  const fetchCase = async (caseId: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('cases')
+        .select(`
+          id,
+          file_number,
+          status,
+          created_at,
+          updated_at,
+          notes,
+          court_file_number,
+          hearing_date,
+          court_registry,
+          judge_name,
+          property: properties (
+            id,
+            street,
+            city,
+            province,
+            postal_code,
+            property_type,
+            pid,
+            legal_description
+          ),
+          parties: case_parties (
+            party: parties (
+              id,
+              name,
+              type,
+              email,
+              phone,
+              address
+            )
+          ),
+          mortgage: mortgages (
+            id,
+            registration_number,
+            principal,
+            interest_rate,
+            start_date,
+            current_balance,
+            per_diem_interest
+          ),
+          deadlines (
+            id,
+            title,
+            description,
+            date,
+            type,
+            complete
+          )
+        `)
+        .eq('id', caseId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        toast.error("Case not found");
+        return;
+      }
+
+      // Transform the data to match the Case type
+      const transformedCase: Case = {
+        id: data.id,
+        fileNumber: data.file_number,
+        status: data.status,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        notes: data.notes || '',
+        property: {
+          id: data.property.id,
+          address: {
+            street: data.property.street,
+            city: data.property.city,
+            province: data.property.province || '',
+            postalCode: data.property.postal_code || ''
+          },
+          pid: data.property.pid || '',
+          legalDescription: data.property.legal_description || '',
+          propertyType: data.property.property_type || 'Residential'
+        },
+        parties: data.parties.map((cp: any) => ({
+          id: cp.party.id,
+          name: cp.party.name,
+          type: cp.party.type,
+          contactInfo: {
+            email: cp.party.email || '',
+            phone: cp.party.phone || '',
+            address: cp.party.address || ''
+          }
+        })),
+        mortgage: {
+          id: data.mortgage.id,
+          registrationNumber: data.mortgage.registration_number,
+          principal: data.mortgage.principal,
+          interestRate: data.mortgage.interest_rate,
+          startDate: data.mortgage.start_date,
+          currentBalance: data.mortgage.current_balance,
+          perDiemInterest: data.mortgage.per_diem_interest || 0
+        },
+        deadlines: data.deadlines.map((deadline: any) => ({
+          id: deadline.id,
+          title: deadline.title,
+          description: deadline.description || '',
+          date: deadline.date,
+          type: deadline.type,
+          complete: deadline.complete
+        })),
+        court: {
+          fileNumber: data.court_file_number || '',
+          registry: data.court_registry || '',
+          hearingDate: data.hearing_date || null,
+          judgeName: data.judge_name || ''
+        },
+        documents: []
+      };
+
+      setActiveCase(transformedCase);
+    } catch (error) {
+      console.error("Error fetching case:", error);
+      toast.error("Failed to load case details", {
+        description: "Please try again later."
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <div className="md:pl-64">
+          <Header />
+          <main className="p-6">
+            <div className="flex items-center mb-6">
+              <Button variant="outline" size="sm" asChild className="mr-4">
+                <Link to="/cases">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Cases
+                </Link>
+              </Button>
+              <h1 className="text-2xl font-bold">Loading Case Details...</h1>
+            </div>
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-law-teal"></div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   if (!activeCase) {
     return (
@@ -53,6 +221,39 @@ export default function CaseDetail() {
             <p className="text-muted-foreground">
               The requested case could not be found. Please return to the case list.
             </p>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // If in edit mode, render the CaseForm
+  if (isEditMode) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <div className="md:pl-64">
+          <Header />
+          <main className="p-6">
+            <div className="flex items-center mb-6">
+              <Button variant="outline" size="sm" asChild className="mr-4">
+                <Link to={`/case/${id}`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Case
+                </Link>
+              </Button>
+              <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
+            </div>
+            <CaseForm 
+              existingCase={activeCase}
+              onCancel={() => {
+                window.location.href = `/case/${id}`;
+              }}
+              onSuccess={(updatedCaseId) => {
+                toast.success("Case updated successfully");
+                window.location.href = `/case/${updatedCaseId}`;
+              }}
+            />
           </main>
         </div>
       </div>
@@ -102,9 +303,11 @@ export default function CaseDetail() {
               </div>
             </div>
             <div className="mt-4 md:mt-0 flex gap-2">
-              <Button variant="outline" className="gap-2">
-                <Clock className="h-4 w-4" />
-                Update Status
+              <Button variant="outline" className="gap-2" asChild>
+                <Link to={`/case/${activeCase.id}?edit=true`}>
+                  <Clock className="h-4 w-4" />
+                  Edit Case
+                </Link>
               </Button>
               <Button className="gap-2 bg-law-teal hover:bg-law-teal/90">
                 <FileText className="h-4 w-4" />
