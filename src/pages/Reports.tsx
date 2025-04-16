@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,7 +121,7 @@ export default function Reports() {
     if (!reportData) return;
     
     const reportTitle = reportType.replace("-", "_");
-    const fileName = `${reportTitle}_report_${formatDate(new Date())}.${formatType}`;
+    let fileName = `${reportTitle}_report_${formatDate(new Date())}.${formatType}`;
     
     // Convert reportData to appropriate format
     let content = '';
