@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,14 +56,6 @@ export default function CaseList() {
   const handleNewCase = () => {
     // This would navigate to the case creation form in a real application
     console.log("Create new case clicked");
-  };
-
-  const handleViewCase = (caseId: string) => {
-    console.log(`View case ${caseId}`);
-  };
-
-  const handleEditCase = (caseId: string) => {
-    console.log(`Edit case ${caseId}`);
   };
 
   return (
@@ -131,7 +124,11 @@ export default function CaseList() {
               ) : (
                 filteredCases.map((caseItem) => (
                   <TableRow key={caseItem.id}>
-                    <TableCell className="font-medium">{caseItem.fileNumber}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link to={`/case/${caseItem.id}`} className="hover:underline text-law-navy">
+                        {caseItem.fileNumber}
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {caseItem.property.address.street}, {caseItem.property.address.city}
                     </TableCell>
@@ -157,13 +154,14 @@ export default function CaseList() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem 
-                            onClick={() => handleViewCase(caseItem.id)}
+                            asChild
                             className="cursor-pointer"
                           >
-                            <Eye className="mr-2 h-4 w-4" /> View Details
+                            <Link to={`/case/${caseItem.id}`}>
+                              <Eye className="mr-2 h-4 w-4" /> View Details
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => handleEditCase(caseItem.id)}
                             className="cursor-pointer"
                           >
                             <FileEdit className="mr-2 h-4 w-4" /> Edit Case
