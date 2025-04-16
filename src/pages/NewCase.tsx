@@ -6,6 +6,7 @@ import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function NewCase() {
   const [loading, setLoading] = useState(false);
@@ -16,9 +17,16 @@ export default function NewCase() {
     navigate('/cases');
   };
 
+  const handleSubmit = async (caseId: string) => {
+    setLoading(false);
+    toast.success("Case created successfully");
+    navigate(`/case/${caseId}`);
+  };
+
   const handleError = (errorMessage: string) => {
     setError(errorMessage);
     setLoading(false);
+    toast.error("Failed to create case");
   };
 
   return (
@@ -44,7 +52,13 @@ export default function NewCase() {
             </Alert>
           )}
           
-          <CaseForm onCancel={handleCancel} />
+          <CaseForm 
+            onCancel={handleCancel} 
+            onSuccess={handleSubmit}
+            onError={handleError}
+            isLoading={loading}
+            setIsLoading={setLoading}
+          />
         </main>
       </div>
     </div>

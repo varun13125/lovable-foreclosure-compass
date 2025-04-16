@@ -30,7 +30,8 @@ export default function CaseListTable({ cases, loading, formatCurrency }: CaseLi
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        Loading cases...
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-law-teal"></div>
+        <span className="ml-2">Loading cases...</span>
       </div>
     );
   }
@@ -57,7 +58,7 @@ export default function CaseListTable({ cases, loading, formatCurrency }: CaseLi
       </TableHeader>
       <TableBody>
         {cases.map((caseItem) => (
-          <TableRow key={caseItem.id}>
+          <TableRow key={caseItem.id} className="cursor-pointer hover:bg-muted/50">
             <TableCell className="font-medium">
               <Link to={`/case/${caseItem.id}`} className="hover:underline text-law-navy">
                 {caseItem.fileNumber}
@@ -96,9 +97,12 @@ export default function CaseListTable({ cases, loading, formatCurrency }: CaseLi
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem 
+                    asChild 
                     className="cursor-pointer"
                   >
-                    <FileEdit className="mr-2 h-4 w-4" /> Edit Case
+                    <Link to={`/case/${caseItem.id}`}>
+                      <FileEdit className="mr-2 h-4 w-4" /> Edit Case
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

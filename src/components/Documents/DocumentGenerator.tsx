@@ -22,9 +22,10 @@ import {
   ChevronRight,
   FileCheck,
   Download,
-  Save
+  Save,
+  Printer
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { mockCases } from "@/data/mockData";
 import { Case, Party, Document } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +40,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [previewMode, setPreviewMode] = useState<boolean>(false);
   const [activeCaseData, setActiveCaseData] = useState<Case | undefined>(undefined);
-  const [cases, setCases] = useState<Case[]>(mockCases);
+  const [cases, setCases] = useState<Case[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
 
   // Template types for document generation
@@ -71,6 +72,11 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     },
   ];
 
+  // Fetch all cases on component mount
+  useEffect(() => {
+    fetchAllCases();
+  }, []);
+
   // Reset document type when case changes
   useEffect(() => {
     setDocumentType("");
@@ -82,107 +88,270 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     }
   }, [selectedCase]);
   
-  // Fetch real case data from Supabase
-  const fetchCaseData = async (caseId: string) => {
+  // Fetch all cases from database
+  const fetchAllCases = async () => {
     try {
-      // Use mock data for now, would replace with real data fetch
-      const caseData = cases.find(c => c.id === caseId);
-      setActiveCaseData(caseData);
-      
-      // Fetch documents for the selected case
-      if (caseId) {
-        const { data, error } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('case_id', caseId)
-          .order('created_at', { ascending: false });
-          
-        if (error) throw error;
-        
-        // Transform to match Document type
-        const transformedDocs: Document[] = data.map(doc => ({
-          id: doc.id,
-          title: doc.title,
-          type: doc.type,
-          createdAt: doc.created_at,
-          status: doc.status,
-          caseId: doc.case_id,
-          url: doc.url || undefined
-        }));
-        
-        setDocuments(transformedDocs);
+      const { data, error } = await supabase
+        .from('cases')
+        .select(`
+          id,
+          file_number,
+          status,
+          created_at,
+          updated_at,
+          property: properties (
+            id,
+            street,
+            city,
+            province,
+            postal_code,
+            property_type
+          ),
+          mortgage: mortgages (
+            id,
+            registration_number,
+            principal,
+            interest_rate,
+            start_date,
+            current_balance,
+            per_diem_interest
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Transform case data
+      if (data) {
+        setCases(data.map(item => ({
+          id: item.id,
+          fileNumber: item.file_number,
+          status: item.status,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          property: {
+            id: item.property?.id || '',
+            address: {
+              street: item.property?.street || '',
+              city: item.property?.city || '',
+              province: item.property?.province || '',
+              postalCode: item.property?.postal_code || ''
+            },
+            pid: '',
+            legalDescription: '',
+            propertyType: item.property?.property_type || 'Residential'
+          },
+          parties: [],
+          mortgage: {
+            id: item.mortgage?.id || '',
+            registrationNumber: item.mortgage?.registration_number || '',
+            principal: item.mortgage?.principal || 0,
+            interestRate: item.mortgage?.interest_rate || 0,
+            startDate: item.mortgage?.start_date || '',
+            currentBalance: item.mortgage?.current_balance || 0,
+            perDiemInterest: item.mortgage?.per_diem_interest || 0
+          },
+          deadlines: [],
+          documents: []
+        })));
       }
     } catch (error) {
+      console.error("Error fetching cases:", error);
+      toast.error("Could not load cases");
+    }
+  };
+
+  // Fetch detailed case data with parties
+  const fetchCaseData = async (caseId: string) => {
+    try {
+      // Fetch case data including parties
+      const { data: caseData, error: caseError } = await supabase
+        .from('cases')
+        .select(`
+          id,
+          file_number,
+          status,
+          created_at,
+          updated_at,
+          notes,
+          court_file_number,
+          court_registry,
+          judge_name,
+          hearing_date,
+          property: properties (
+            id,
+            street,
+            city,
+            province,
+            postal_code,
+            property_type,
+            pid,
+            legal_description
+          ),
+          mortgage: mortgages (
+            id,
+            registration_number,
+            principal,
+            interest_rate,
+            start_date,
+            current_balance,
+            per_diem_interest,
+            arrears
+          )
+        `)
+        .eq('id', caseId)
+        .single();
+
+      if (caseError) throw caseError;
+
+      // Fetch parties for this case
+      const { data: partyData, error: partyError } = await supabase
+        .from('case_parties')
+        .select(`
+          party: parties (
+            id,
+            name,
+            type,
+            email,
+            phone,
+            address
+          )
+        `)
+        .eq('case_id', caseId);
+
+      if (partyError) throw partyError;
+
+      // Fetch documents for the case
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('created_at', { ascending: false });
+          
+      if (docError) throw docError;
+        
+      // Transform to match Document type
+      const transformedDocs: Document[] = docData?.map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        type: doc.type,
+        createdAt: doc.created_at,
+        status: doc.status,
+        caseId: doc.case_id,
+        url: doc.url || undefined
+      })) || [];
+      
+      setDocuments(transformedDocs);
+
+      // Transform parties data
+      const parties = partyData?.map(p => ({
+        id: p.party.id,
+        name: p.party.name,
+        type: p.party.type,
+        contactInfo: {
+          email: p.party.email || '',
+          phone: p.party.phone || '',
+          address: p.party.address || ''
+        }
+      })) || [];
+
+      // Create the full case object
+      const fullCase: Case = {
+        id: caseData.id,
+        fileNumber: caseData.file_number,
+        status: caseData.status,
+        createdAt: caseData.created_at,
+        updatedAt: caseData.updated_at,
+        notes: caseData.notes,
+        court: {
+          fileNumber: caseData.court_file_number,
+          registry: caseData.court_registry,
+          judgeName: caseData.judge_name,
+          hearingDate: caseData.hearing_date
+        },
+        property: {
+          id: caseData.property.id,
+          address: {
+            street: caseData.property.street,
+            city: caseData.property.city,
+            province: caseData.property.province || '',
+            postalCode: caseData.property.postal_code || ''
+          },
+          pid: caseData.property.pid || '',
+          legalDescription: caseData.property.legal_description || '',
+          propertyType: caseData.property.property_type
+        },
+        mortgage: {
+          id: caseData.mortgage.id,
+          registrationNumber: caseData.mortgage.registration_number,
+          principal: caseData.mortgage.principal,
+          interestRate: caseData.mortgage.interest_rate,
+          startDate: caseData.mortgage.start_date,
+          currentBalance: caseData.mortgage.current_balance,
+          perDiemInterest: caseData.mortgage.per_diem_interest,
+          arrears: caseData.mortgage.arrears
+        },
+        parties: parties,
+        deadlines: [],
+        documents: transformedDocs
+      };
+
+      setActiveCaseData(fullCase);
+      
+    } catch (error) {
       console.error("Error fetching case data:", error);
-      toast({
-        title: "Error",
-        description: "Could not load case data",
-        variant: "destructive"
-      });
+      toast.error("Could not load case data");
     }
   };
 
   const handleGenerate = async () => {
     if (!selectedCase || !documentType) {
-      toast({
-        title: "Missing Information",
-        description: "Please select both a case and document type.",
-        variant: "destructive"
-      });
+      toast.error("Please select both a case and document type");
       return;
     }
 
     setIsGenerating(true);
     
     try {
-      // In a real app, we would generate the document content here
-      // For now, simulate document generation with timeout
-      setTimeout(async () => {
-        // Create a new document record in the database
-        const documentTitle = `${getDocumentTypeName(documentType)} - ${activeCaseData?.fileNumber || "Unknown"}`;
-        
-        const { data: docData, error } = await supabase
-          .from('documents')
-          .insert({
-            title: documentTitle,
-            type: mapDocumentTypeToEnum(documentType),
-            case_id: selectedCase,
-            status: "Draft",
-            content: generateDocumentContent(documentType, activeCaseData)
-          })
-          .select('*')
-          .single();
+      // Generate document content based on template and case data
+      const documentContent = generateDocumentContent(documentType, activeCaseData);
+      const documentTitle = `${getDocumentTypeName(documentType)} - ${activeCaseData?.fileNumber || "Unknown"}`;
+      
+      // Create a new document record in the database
+      const { data: docData, error } = await supabase
+        .from('documents')
+        .insert({
+          title: documentTitle,
+          type: mapDocumentTypeToEnum(documentType),
+          case_id: selectedCase,
+          status: "Draft",
+          content: documentContent
+        })
+        .select('*')
+        .single();
           
-        if (error) throw error;
+      if (error) throw error;
         
-        // Add the new document to the list
-        const newDoc: Document = {
-          id: docData.id,
-          title: docData.title,
-          type: docData.type,
-          createdAt: docData.created_at,
-          status: docData.status,
-          caseId: docData.case_id,
-          url: docData.url || undefined
-        };
+      // Add the new document to the list
+      const newDoc: Document = {
+        id: docData.id,
+        title: docData.title,
+        type: docData.type,
+        createdAt: docData.created_at,
+        status: docData.status,
+        caseId: docData.case_id,
+        url: docData.url || undefined
+      };
         
-        setDocuments(prev => [newDoc, ...prev]);
-        setIsGenerating(false);
-        setPreviewMode(true);
+      setDocuments(prev => [newDoc, ...prev]);
+      setIsGenerating(false);
+      setPreviewMode(true);
         
-        toast({
-          title: "Document Generated",
-          description: `${documentTitle} created successfully.`,
-        });
-      }, 1500);
+      toast.success(`${documentTitle} created successfully`);
     } catch (error) {
       console.error("Error generating document:", error);
       setIsGenerating(false);
-      toast({
-        title: "Error",
-        description: "Failed to generate document",
-        variant: "destructive"
-      });
+      toast.error("Failed to generate document");
     }
   };
 
@@ -226,25 +395,45 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
     const borrower = caseData.parties.find(p => p.type === "Borrower");
     const lender = caseData.parties.find(p => p.type === "Lender");
     
+    // Format date helper function
+    const formatDateString = (dateStr?: string) => {
+      if (!dateStr) return new Date().toLocaleDateString('en-CA');
+      return new Date(dateStr).toLocaleDateString('en-CA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    // Format currency helper function
+    const formatCurrency = (value: number) => {
+      return new Intl.NumberFormat('en-CA', {
+        style: 'currency',
+        currency: 'CAD'
+      }).format(value);
+    };
+    
     switch (docType) {
       case "demand":
         return `WITHOUT PREJUDICE
 
+DATE: ${formatDateString()}
+
 RE: DEMAND FOR PAYMENT
 
-Property: ${caseData.property.address.street}, ${caseData.property.address.city}
-Mortgage: ${caseData.mortgage.registrationNumber}
-Balance Due: $${caseData.mortgage.currentBalance.toLocaleString()}
+Property: ${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province}
+Mortgage Registration: ${caseData.mortgage.registrationNumber}
+Balance Due: ${formatCurrency(caseData.mortgage.currentBalance)}
 
-Dear ${borrower?.name},
+Dear ${borrower?.name || "[BORROWER NAME]"},
 
-Please be advised that we represent ${lender?.name} in connection with the above-noted mortgage. Our client advises that you are in default of your payment obligations under the mortgage.
+Please be advised that we represent ${lender?.name || "[LENDER NAME]"} in connection with the above-noted mortgage. Our client advises that you are in default of your payment obligations under the mortgage.
 
-As of ${new Date().toLocaleDateString()}, the following amounts are due and owing:
+As of ${formatDateString()}, the following amounts are due and owing:
 
-Principal Balance: $${caseData.mortgage.currentBalance.toLocaleString()}
-Arrears: $${caseData.mortgage.arrears?.toLocaleString() || "0.00"}
-Per Diem Interest: $${caseData.mortgage.perDiemInterest.toLocaleString()}/day
+Principal Balance: ${formatCurrency(caseData.mortgage.currentBalance)}
+Arrears: ${formatCurrency(caseData.mortgage.arrears || 0)}
+Per Diem Interest: ${formatCurrency(caseData.mortgage.perDiemInterest)}/day
 
 DEMAND IS HEREBY MADE for payment of the full amount due and owing within 10 days of the date of this letter, failing which our client may commence foreclosure proceedings without further notice to you.
 
@@ -257,29 +446,58 @@ ${caseData.court?.registry || "Vancouver"} Registry
 IN THE SUPREME COURT OF BRITISH COLUMBIA
 
 BETWEEN:
-${lender?.name}
+${lender?.name || "[LENDER NAME]"}
 PETITIONER
 
 AND:
-${borrower?.name}
+${borrower?.name || "[BORROWER NAME]"}
 RESPONDENT
 
 PETITION TO THE COURT
 
 ON NOTICE TO:
-${borrower?.name}, of ${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province}
+${borrower?.name || "[BORROWER NAME]"}, of ${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province} ${caseData.property.address.postalCode}
 
 This proceeding is brought for the foreclosure of a mortgage.
+
+THE PETITIONER CLAIMS:
+
+1. An Order Nisi of Foreclosure with respect to the lands and premises legally described as:
+   PID: ${caseData.property.pid || "[PID]"}
+   ${caseData.property.legalDescription || "[LEGAL DESCRIPTION]"}
+   (the "Property")
+
+2. A declaration that as at ${formatDateString()}, the Respondent is indebted to the Petitioner under the mortgage in the amount of ${formatCurrency(caseData.mortgage.currentBalance)}.
+
+3. A declaration that the monies secured by the mortgage are due and owing to the Petitioner.
+
+4. Interest pursuant to the mortgage at the rate of ${caseData.mortgage.interestRate}% per annum.
+
+5. A redemption period of six months.
 
 [...]`;
       
       case "payout":
         return `MORTGAGE PAYOUT STATEMENT
 
-Property: ${caseData.property.address.street}
-Mortgagor: ${borrower?.name}
-Principal Balance: $${caseData.mortgage.currentBalance.toLocaleString()}
-Per Diem Interest: $${caseData.mortgage.perDiemInterest.toLocaleString()}/day
+DATE: ${formatDateString()}
+
+RE: ${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province}
+
+Mortgagor: ${borrower?.name || "[BORROWER NAME]"}
+Mortgagee: ${lender?.name || "[LENDER NAME]"}
+Mortgage Registration: ${caseData.mortgage.registrationNumber}
+
+MORTGAGE BALANCE
+
+Principal Balance: ${formatCurrency(caseData.mortgage.currentBalance)}
+Interest to ${formatDateString()}: ${formatCurrency((caseData.mortgage.perDiemInterest || 0) * 10)} (10 days)
+Per Diem Interest: ${formatCurrency(caseData.mortgage.perDiemInterest)}/day
+Legal Fees and Disbursements: ${formatCurrency(1250.00)} (estimated)
+
+TOTAL PAYOUT AMOUNT: ${formatCurrency(caseData.mortgage.currentBalance + ((caseData.mortgage.perDiemInterest || 0) * 10) + 1250.00)}
+
+This statement is valid until ${formatDateString(new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString())}
 
 [...]`;
         
@@ -290,18 +508,26 @@ No. ${caseData.court?.fileNumber || "[Court File Number]"}
 ${caseData.court?.registry || "Vancouver"} Registry
 
 BEFORE THE HONOURABLE
-JUSTICE [NAME]
+JUSTICE ${caseData.court?.judgeName || "[NAME]"}
 )
 )
-) [DATE]
+) ${formatDateString(caseData.court?.hearingDate)}
 
 BETWEEN:
-${lender?.name}
+${lender?.name || "[LENDER NAME]"}
 PETITIONER
 
 AND:
-${borrower?.name}
+${borrower?.name || "[BORROWER NAME]"}
 RESPONDENT
+
+ORDER
+
+THIS APPLICATION of the Petitioner coming on for hearing before me on ${formatDateString(caseData.court?.hearingDate)} and on hearing counsel for the Petitioner and no one appearing for the Respondent although duly served; AND JUDGMENT being granted to the Petitioner against the Respondent for the sum of ${formatCurrency(caseData.mortgage.currentBalance)} together with interest thereon at the rate of ${caseData.mortgage.interestRate}% per annum from the date of judgment.
+
+THIS COURT ORDERS that:
+
+1. The Respondent shall have a period of six (6) months from the date of this Order (the "Redemption Period") to redeem the mortgage in question (the "Mortgage") by paying to the Petitioner the sum of ${formatCurrency(caseData.mortgage.currentBalance)} together with interest thereon at the rate of ${caseData.mortgage.interestRate}% per annum from the date of judgment.
 
 [...]
 REDEMPTION PERIOD: 6 MONTHS`;
@@ -313,17 +539,104 @@ No. ${caseData.court?.fileNumber || "[Court File Number]"}
 ${caseData.court?.registry || "Vancouver"} Registry
 
 BETWEEN:
-${lender?.name}
+${lender?.name || "[LENDER NAME]"}
 PETITIONER
 
 AND:
-${borrower?.name}
+${borrower?.name || "[BORROWER NAME]"}
 RESPONDENT
+
+APPLICATION
+
+TO: The Respondents, ${borrower?.name || "[BORROWER NAME]"}
+
+TAKE NOTICE that an application will be made by the Petitioner to the presiding Judge at the Courthouse at ${caseData.court?.registry || "Vancouver"}, British Columbia, on ${formatDateString(caseData.court?.hearingDate)} for an Order that:
+
+1. The Petitioner shall have conduct of sale of the lands and premises legally described as:
+   PID: ${caseData.property.pid || "[PID]"}
+   ${caseData.property.legalDescription || "[LEGAL DESCRIPTION]"}
+   (the "Property")
+
+2. The Property shall be listed for sale on the Multiple Listing Service with a licensed real estate agent chosen by the Petitioner;
+
+3. The Petitioner shall be at liberty to approve any offer to purchase the Property;
+
+4. The sale shall be free and clear of the interest of all Respondents;
 
 [...]`;
       
       default:
         return "";
+    }
+  };
+
+  const handleSaveDocument = async (documentId: string) => {
+    toast.success("Document status updated to 'Finalized'");
+    
+    try {
+      // Update document status in database
+      await supabase
+        .from('documents')
+        .update({ status: 'Finalized' })
+        .eq('id', documentId);
+        
+      // Update local state
+      setDocuments(docs => 
+        docs.map(doc => 
+          doc.id === documentId 
+            ? { ...doc, status: 'Finalized' } 
+            : doc
+        )
+      );
+    } catch (error) {
+      console.error("Error updating document:", error);
+      toast.error("Failed to update document");
+    }
+  };
+  
+  const handlePrintDocument = (documentId: string) => {
+    // In a real app, this would generate a PDF and print it
+    toast.success("Printing document...");
+    
+    // For demo purposes, open a print dialog with the document content
+    const documentToPrint = documents.find(doc => doc.id === documentId);
+    if (documentToPrint) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${documentToPrint.title}</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  margin: 40px;
+                  line-height: 1.5;
+                }
+                h1 {
+                  text-align: center;
+                  font-size: 18px;
+                  margin-bottom: 20px;
+                }
+                pre {
+                  white-space: pre-wrap;
+                  font-family: Arial, sans-serif;
+                }
+              </style>
+            </head>
+            <body>
+              <h1>${documentToPrint.title}</h1>
+              <pre>${documentToPrint.id}</pre>
+              <script>
+                window.onload = function() {
+                  window.print();
+                }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
     }
   };
 
@@ -409,9 +722,20 @@ RESPONDENT
                     <FileText className="h-4 w-4" />
                     Edit
                   </Button>
-                  <Button className="gap-2 bg-law-navy hover:bg-law-navy/90">
-                    <Download className="h-4 w-4" />
-                    Download
+                  <Button 
+                    className="gap-2 bg-law-navy hover:bg-law-navy/90"
+                    onClick={() => handleSaveDocument(documents[0]?.id)}
+                  >
+                    <Save className="h-4 w-4" />
+                    Save Final
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    className="gap-2"
+                    onClick={() => handlePrintDocument(documents[0]?.id)}
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print
                   </Button>
                 </>
               ) : (
@@ -419,8 +743,14 @@ RESPONDENT
                   <Button 
                     variant="outline" 
                     className="gap-2" 
-                    onClick={() => setPreviewMode(true)}
-                    disabled={!selectedCase || !documentType}
+                    onClick={() => {
+                      if (selectedCase && documentType && activeCaseData) {
+                        setPreviewMode(true);
+                      } else {
+                        toast.error("Please select case and document type");
+                      }
+                    }}
+                    disabled={!selectedCase || !documentType || !activeCaseData}
                   >
                     <FilePlus className="h-4 w-4" />
                     Preview
@@ -428,7 +758,7 @@ RESPONDENT
                   <Button 
                     className="gap-2 bg-law-navy hover:bg-law-navy/90"
                     onClick={handleGenerate}
-                    disabled={!selectedCase || !documentType || isGenerating}
+                    disabled={!selectedCase || !documentType || !activeCaseData || isGenerating}
                   >
                     {isGenerating ? (
                       <div className="flex items-center gap-1">
@@ -454,13 +784,24 @@ RESPONDENT
                 documents.slice(0, 5).map((doc) => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-2 rounded border"
+                    className="flex items-center justify-between p-2 rounded border hover:bg-muted/50"
                   >
                     <div className="flex items-center gap-2">
                       <FileCheck className="h-4 w-4 text-law-teal" />
                       <span className="text-sm">{doc.title}</span>
                     </div>
-                    <Badge variant="outline">{doc.status}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{doc.status}</Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => handlePrintDocument(doc.id)}
+                      >
+                        <Printer className="h-4 w-4" />
+                        <span className="sr-only">Print</span>
+                      </Button>
+                    </div>
                   </div>
                 ))
               ) : (
