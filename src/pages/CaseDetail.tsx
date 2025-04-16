@@ -23,7 +23,7 @@ import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import DocumentGenerator from "@/components/Documents/DocumentGenerator";
 import { getStatusColor } from "@/data/mockData";
-import { Case } from "@/types";
+import { Case, Deadline } from "@/types";
 import CaseTimeline from "@/components/Cases/CaseTimeline";
 import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
@@ -155,7 +155,8 @@ export default function CaseDetail() {
           description: deadline.description || '',
           date: deadline.date,
           type: deadline.type,
-          complete: deadline.complete
+          complete: deadline.complete,
+          caseId: caseId // Add the caseId that's required by the type definition
         })),
         court: {
           fileNumber: data.court_file_number || '',
@@ -245,13 +246,18 @@ export default function CaseDetail() {
               <h1 className="text-2xl font-bold">Edit Case: {activeCase.fileNumber}</h1>
             </div>
             <CaseForm 
-              existingCase={activeCase}
+              initialData={activeCase}
               onCancel={() => {
                 window.location.href = `/case/${id}`;
               }}
-              onSuccess={(updatedCaseId) => {
+              onSubmitSuccess={(updatedCaseId) => {
                 toast.success("Case updated successfully");
                 window.location.href = `/case/${updatedCaseId}`;
+              }}
+              onSubmitError={(errorMessage) => {
+                toast.error("Failed to update case", {
+                  description: errorMessage || "Please try again."
+                });
               }}
             />
           </main>

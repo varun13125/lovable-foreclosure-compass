@@ -1,11 +1,11 @@
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, CalendarClock } from "lucide-react";
-import { mockCases } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
 import { Deadline } from "@/types";
 
 interface CaseDeadlinesProps {
@@ -14,21 +14,49 @@ interface CaseDeadlinesProps {
 }
 
 export default function CaseDeadlines({ caseId, limit }: CaseDeadlinesProps) {
-  const caseData = useMemo(() => mockCases.find(c => c.id === caseId), [caseId]);
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  if (!caseData) {
-    return <div>Case not found</div>;
-  }
+  useEffect(() => {
+    fetchDeadlines();
+  }, [caseId]);
   
-  // Sort deadlines by date, incomplete first
-  const sortedDeadlines = [...caseData.deadlines].sort((a, b) => {
-    if (a.complete !== b.complete) {
-      return a.complete ? 1 : -1;
+  const fetchDeadlines = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('deadlines')
+        .select('*')
+        .eq('case_id', caseId)
+        .order('date', { ascending: true })
+        .order('complete', { ascending: true });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Transform data to match Deadline type
+      const transformedDeadlines: Deadline[] = data?.map(item => ({
+        id: item.id,
+        title: item.title,
+        description: item.description || '',
+        date: item.date,
+        type: item.type,
+        complete: item.complete,
+        caseId: item.case_id
+      })) || [];
+      
+      setDeadlines(transformedDeadlines);
+    } catch (error) {
+      console.error("Error fetching deadlines:", error);
+    } finally {
+      setLoading(false);
     }
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
-
-  const displayDeadlines = limit ? sortedDeadlines.slice(0, limit) : sortedDeadlines;
+  };
+  
+  // Apply limit if provided
+  const displayDeadlines = limit ? deadlines.slice(0, limit) : deadlines;
 
   // Function to format relative dates
   const getRelativeDate = (dateStr: string) => {
@@ -67,6 +95,40 @@ export default function CaseDeadlines({ caseId, limit }: CaseDeadlinesProps) {
     if (diffDays < 7) return "high";
     return "normal";
   };
+  
+  const toggleDeadlineComplete = async (deadline: Deadline) => {
+    try {
+      const { error } = await supabase
+        .from('deadlines')
+        .update({ complete: !deadline.complete })
+        .eq('id', deadline.id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setDeadlines(deadlines.map(d => 
+        d.id === deadline.id ? { ...d, complete: !d.complete } : d
+      ));
+    } catch (error) {
+      console.error("Error updating deadline:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card className="shadow-sm h-full">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CalendarClock className="h-5 w-5" />
+            {limit ? "Upcoming Deadlines" : "All Deadlines"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-law-teal"></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="shadow-sm h-full">
@@ -86,6 +148,7 @@ export default function CaseDeadlines({ caseId, limit }: CaseDeadlinesProps) {
           <div className="text-center py-8 text-muted-foreground">
             <AlertCircle className="mx-auto h-8 w-8 mb-2 opacity-50" />
             <p>No deadlines found for this case</p>
+            <Button className="mt-4" size="sm">Add Deadline</Button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -102,7 +165,10 @@ export default function CaseDeadlines({ caseId, limit }: CaseDeadlinesProps) {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Checkbox checked={deadline.complete} />
+                    <Checkbox 
+                      checked={deadline.complete} 
+                      onCheckedChange={() => toggleDeadlineComplete(deadline)}
+                    />
                     <div>
                       <div className="font-medium">{deadline.title}</div>
                       <div className="text-xs text-muted-foreground">
