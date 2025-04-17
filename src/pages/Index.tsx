@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -159,7 +158,7 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4">
-              <DocumentGenerator />
+              <DocumentGenerator selectedCase={null} />
             </TabsContent>
           </Tabs>
         </main>

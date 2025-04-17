@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
+// Need to extend jsPDF with autotable
 import 'jspdf-autotable';
 import { Button } from "@/components/ui/button";
 import { Case } from '@/types';
@@ -11,6 +12,13 @@ import { format, parseISO } from 'date-fns';
 interface DocumentGeneratorProps {
   selectedCase: Case | null;
   caseId?: string; // Add caseId as an optional property
+}
+
+// Need to extend jsPDF with the autotable plugin
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
 }
 
 const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, caseId }) => {
@@ -169,7 +177,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
       doc.text(`Principal Amount: ${currentCase.mortgage.principal.toString()}`, 10, yOffset);
 
       // Example table (using jspdf-autotable)
-      (doc as any).autoTable({
+      doc.autoTable({
         head: [['Header 1', 'Header 2']],
         body: [
           ['row 1 col 1', 'row 1 col 2'],
@@ -204,9 +212,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
         const newDocument = {
           case_id: currentCase.id,
           title: filename,
-          type: documentType,
+          type: documentType as "Demand Letter" | "Petition" | "Order Nisi" | "Conduct of Sale" | "Affidavit" | "Final Order" | "Other",
           created_at: new Date().toISOString(),
-          status: "Finalized",
+          status: "Finalized" as "Draft" | "Finalized" | "Filed" | "Served",
           url: data.path // Store the path in Supabase storage
         };
 
