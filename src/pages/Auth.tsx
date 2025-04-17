@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Scale, ArrowRight, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Auth() {
   const { authState, signIn, signUp } = useAuth();
@@ -16,6 +17,7 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   
   // Register form state
   const [registerEmail, setRegisterEmail] = useState('');
@@ -23,11 +25,25 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [registerLoading, setRegisterLoading] = useState(false);
 
   // Handle login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signIn(loginEmail, loginPassword);
+    setLoginLoading(true);
+    
+    try {
+      const { error } = await signIn(loginEmail, loginPassword);
+      
+      if (error) {
+        toast.error(error.message || 'Failed to sign in');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   // Handle registration
@@ -35,11 +51,27 @@ export default function Auth() {
     e.preventDefault();
     
     if (registerPassword !== confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
     
-    await signUp(registerEmail, registerPassword, firstName, lastName);
+    setRegisterLoading(true);
+    
+    try {
+      const { error } = await signUp(registerEmail, registerPassword, firstName, lastName);
+      
+      if (error) {
+        toast.error(error.message || 'Failed to create account');
+      } else {
+        toast.success('Account created! Please check your email for verification.');
+        setAuthTab('login');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setRegisterLoading(false);
+    }
   };
 
   // If user is already authenticated, redirect to dashboard
@@ -103,9 +135,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full bg-law-navy hover:bg-law-navy/90"
-                    disabled={authState.loading}
+                    disabled={loginLoading}
                   >
-                    {authState.loading ? (
+                    {loginLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing In...
@@ -187,9 +219,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full bg-law-teal hover:bg-law-teal/90"
-                    disabled={authState.loading}
+                    disabled={registerLoading}
                   >
-                    {authState.loading ? (
+                    {registerLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating Account...

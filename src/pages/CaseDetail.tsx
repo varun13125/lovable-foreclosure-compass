@@ -33,6 +33,7 @@ import CaseStatusUpdate from "@/components/Cases/CaseStatusUpdate";
 import { supabase } from "@/integrations/supabase/client";
 import AddDeadlineDialog from "@/components/Cases/AddDeadlineDialog";
 import AddPartyDialog from "@/components/Cases/AddPartyDialog";
+import { v4 as uuidv4 } from "uuid";
 
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
@@ -46,7 +47,6 @@ export default function CaseDetail() {
   const [addPartyOpen, setAddPartyOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   
-  // For financials section visibility
   const [financeLoading, setFinanceLoading] = useState(false);
   
   useEffect(() => {
@@ -55,7 +55,6 @@ export default function CaseDetail() {
     }
   }, [id]);
   
-  // Handle tab changes from URL
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab) {
@@ -129,7 +128,19 @@ export default function CaseDetail() {
         return;
       }
 
-      // Transform the data to match the Case type
+      const newProperty: Property = {
+        id: uuidv4(),
+        address: {
+          street: data.property?.address?.street || "",
+          city: data.property?.address?.city || "",
+          province: data.property?.address?.province || "",
+          postalCode: data.property?.address?.postalCode || "",
+        },
+        pid: data.property?.pid || "",
+        legal_description: data.property?.legal_description || "",
+        propertyType: data.property?.propertyType || "Residential",
+      };
+
       const transformedCase: Case = {
         id: data.id,
         fileNumber: data.file_number,
@@ -137,18 +148,7 @@ export default function CaseDetail() {
         createdAt: data.created_at,
         updatedAt: data.updated_at,
         notes: data.notes || '',
-        property: {
-          id: data.property.id,
-          address: {
-            street: data.property.street,
-            city: data.property.city,
-            province: data.property.province || '',
-            postalCode: data.property.postal_code || ''
-          },
-          pid: data.property.pid || '',
-          legalDescription: data.property.legal_description || '',
-          propertyType: data.property.property_type || 'Residential'
-        },
+        property: newProperty,
         parties: data.parties.map((cp: any) => ({
           id: cp.party.id,
           name: cp.party.name,
@@ -211,19 +211,16 @@ export default function CaseDetail() {
     if (!activeCase) return;
     
     try {
-      // Add timestamp and user to notes
       const now = new Date();
       const timestamp = now.toLocaleString();
-      const userName = "Current User"; // In a real app, get this from auth context
+      const userName = "Current User";
       let updatedNotes = "";
       
-      // Format: [timestamp - userName] Note content
       if (notes.trim()) {
         updatedNotes = activeCase.notes 
           ? `${activeCase.notes}\n\n[${timestamp} - ${userName}] ${notes.trim()}`
           : `[${timestamp} - ${userName}] ${notes.trim()}`;
       } else {
-        // If note is empty, don't add anything
         updatedNotes = activeCase.notes || '';
       }
       
@@ -237,13 +234,12 @@ export default function CaseDetail() {
       toast.success("Notes updated successfully");
       setIsEditingNotes(false);
       
-      // Update the local state
       setActiveCase({
         ...activeCase,
         notes: updatedNotes
       });
       
-      setNotes(""); // Clear the input field after saving
+      setNotes("");
     } catch (error) {
       console.error("Error updating notes:", error);
       toast.error("Failed to update notes");
@@ -253,7 +249,6 @@ export default function CaseDetail() {
   const handleGenerateDocuments = () => {
     setActiveTab("documents");
     
-    // Use setTimeout to ensure the tab change has taken effect
     setTimeout(() => {
       const documentsTabPanel = document.querySelector('[data-value="documents"][role="tabpanel"]');
       if (documentsTabPanel) {
@@ -647,7 +642,6 @@ export default function CaseDetail() {
         </main>
       </div>
       
-      {/* Add Deadline Dialog */}
       <AddDeadlineDialog 
         open={addDeadlineOpen} 
         onOpenChange={setAddDeadlineOpen} 
@@ -658,7 +652,6 @@ export default function CaseDetail() {
         }}
       />
       
-      {/* Add Party Dialog */}
       <AddPartyDialog 
         open={addPartyOpen} 
         onOpenChange={setAddPartyOpen} 

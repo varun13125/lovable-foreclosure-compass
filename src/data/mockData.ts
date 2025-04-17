@@ -1,464 +1,393 @@
+import { Case, Deadline, Document, LawFirm, Mortgage, Party, Property, RecentActivity, UserProfile } from "@/types";
 
-import { Case, RecentActivity } from '../types';
-
-const currentDate = new Date();
-
-const generateDateString = (daysToAdd: number): string => {
-  const date = new Date();
-  date.setDate(date.getDate() + daysToAdd);
-  return date.toISOString();
-};
-
-export const mockCases: Case[] = [
+// Mock data for properties
+export const mockProperties: Property[] = [
   {
-    id: '1',
-    fileNumber: 'FC-2023-001',
-    status: 'New',
-    property: {
-      id: '1',
-      address: {
-        street: '123 Main Street',
-        city: 'Vancouver',
-        province: 'BC',
-        postalCode: 'V6B 2W9',
-      },
-      pid: '012-345-678',
-      legalDescription: 'Lot 1, Block A, District Lot 123, Plan 456',
-      propertyType: 'Residential',
-      estimatedValue: 850000,
+    id: "prop-1",
+    address: {
+      street: "123 Main Street",
+      city: "Vancouver",
+      province: "BC",
+      postalCode: "V6K 1P3"
     },
-    mortgage: {
-      id: '1',
-      registrationNumber: 'CA123456',
-      principal: 450000,
-      interestRate: 4.5,
-      startDate: '2020-01-15',
-      paymentAmount: 2275.33,
-      paymentFrequency: 'Monthly',
-      currentBalance: 410350.22,
-      perDiemInterest: 50.55,
-      arrears: 12000,
+    pid: "005-123-456",
+    legal_description: "Lot 1, Block A, Plan 12345",
+    propertyType: "Residential",
+    estimatedValue: 950000
+  },
+  {
+    id: "prop-2",
+    address: {
+      street: "456 Oak Avenue",
+      city: "Burnaby",
+      province: "BC",
+      postalCode: "V5G 2H4"
     },
-    parties: [
-      {
-        id: '1',
-        name: 'John Smith',
-        type: 'Borrower',
-        contactInfo: {
-          email: 'john@example.com',
-          phone: '604-555-1234',
-          address: '123 Main Street, Vancouver, BC, V6B 2W9',
-        },
-      },
-      {
-        id: '2',
-        name: 'First BC Credit Union',
-        type: 'Lender',
-        contactInfo: {
-          email: 'lending@firstbc.com',
-          phone: '604-555-5678',
-          address: '789 Granville St, Vancouver, BC, V6Z 1X6',
-        },
-      },
-    ],
-    createdAt: generateDateString(-5),
-    updatedAt: generateDateString(-2),
-    deadlines: [
-      {
-        id: '1',
-        title: 'Send Demand Letter',
-        description: 'Send formal demand letter to borrower',
-        date: generateDateString(2),
-        complete: false,
-        caseId: '1',
-        type: 'Internal',
-      },
-      {
-        id: '2',
-        title: 'Follow up on Demand Letter',
-        description: '10-day follow up after demand letter',
-        date: generateDateString(12),
-        complete: false,
-        caseId: '1',
-        type: 'Statutory',
-      },
-    ],
-    documents: [],
-    notes: 'Client wants to proceed with foreclosure due to missed payments over 3 months.'
+    pid: "006-789-012",
+    legal_description: "Lot 2, Block B, Plan 67890",
+    propertyType: "Commercial",
+    estimatedValue: 1200000
   },
   {
-    id: '2',
-    fileNumber: 'FC-2023-002',
-    status: 'Demand Letter Sent',
-    property: {
-      id: '2',
-      address: {
-        street: '456 Oak Avenue',
-        city: 'Victoria',
-        province: 'BC',
-        postalCode: 'V8V 3K3',
-      },
-      pid: '987-654-321',
-      legalDescription: 'Lot 7, Plan VIP12345, Section 10',
-      propertyType: 'Residential',
-      estimatedValue: 735000,
+    id: "prop-3",
+    address: {
+      street: "789 Pine Lane",
+      city: "Surrey",
+      province: "BC",
+      postalCode: "V3R 5S7"
     },
-    mortgage: {
-      id: '2',
-      registrationNumber: 'CA654321',
-      principal: 385000,
-      interestRate: 3.75,
-      startDate: '2019-06-01',
-      paymentAmount: 1855.42,
-      paymentFrequency: 'Monthly',
-      currentBalance: 345200.75,
-      perDiemInterest: 35.42,
-      arrears: 9200,
-    },
-    parties: [
-      {
-        id: '3',
-        name: 'Sarah Johnson',
-        type: 'Borrower',
-        contactInfo: {
-          email: 'sarah@example.com',
-          phone: '250-555-9876',
-          address: '456 Oak Avenue, Victoria, BC, V8V 3K3',
-        },
-      },
-      {
-        id: '4',
-        name: 'West Coast Bank',
-        type: 'Lender',
-        contactInfo: {
-          email: 'mortgages@wcbank.com',
-          phone: '250-555-4321',
-          address: '123 Banking Street, Victoria, BC, V8V 1A1',
-        },
-      },
-    ],
-    createdAt: generateDateString(-20),
-    updatedAt: generateDateString(-7),
-    deadlines: [
-      {
-        id: '3',
-        title: 'Demand Letter Response Deadline',
-        description: '10-day statutory deadline for response',
-        date: generateDateString(3),
-        complete: false,
-        caseId: '2',
-        type: 'Statutory',
-      },
-      {
-        id: '4',
-        title: 'Prepare Petition',
-        description: 'Prepare petition if no response to demand letter',
-        date: generateDateString(4),
-        complete: false,
-        caseId: '2',
-        type: 'Internal',
-      },
-    ],
-    documents: [
-      {
-        id: '1',
-        title: 'Demand Letter',
-        type: 'Demand Letter',
-        createdAt: generateDateString(-7),
-        status: 'Finalized',
-        caseId: '2',
-      },
-    ],
-    notes: 'Demand letter sent via registered mail. Awaiting response from borrower.'
-  },
-  {
-    id: '3',
-    fileNumber: 'FC-2023-003',
-    status: 'Order Nisi Granted',
-    property: {
-      id: '3',
-      address: {
-        street: '789 Cedar Road',
-        city: 'Kelowna',
-        province: 'BC',
-        postalCode: 'V1Y 3B3',
-      },
-      pid: '456-789-012',
-      legalDescription: 'Lot 12, Plan KAP87654',
-      propertyType: 'Residential',
-      estimatedValue: 620000,
-    },
-    mortgage: {
-      id: '3',
-      registrationNumber: 'CA987654',
-      principal: 325000,
-      interestRate: 4.2,
-      startDate: '2018-03-15',
-      paymentAmount: 1587.65,
-      paymentFrequency: 'Monthly',
-      currentBalance: 287432.87,
-      perDiemInterest: 33.12,
-      arrears: 15300,
-    },
-    parties: [
-      {
-        id: '5',
-        name: 'Michael Chen',
-        type: 'Borrower',
-        contactInfo: {
-          email: 'michael@example.com',
-          phone: '250-555-7777',
-          address: '789 Cedar Road, Kelowna, BC, V1Y 3B3',
-        },
-      },
-      {
-        id: '6',
-        name: 'Interior Savings',
-        type: 'Lender',
-        contactInfo: {
-          email: 'loans@interiorsavings.com',
-          phone: '250-555-8888',
-          address: '555 Banking Ave, Kelowna, BC, V1Y 1A1',
-        },
-      },
-    ],
-    createdAt: generateDateString(-90),
-    updatedAt: generateDateString(-15),
-    court: {
-      fileNumber: 'S-12345',
-      registry: 'Kelowna',
-      hearingDate: generateDateString(-15),
-      judgeName: 'Justice Williams',
-    },
-    deadlines: [
-      {
-        id: '5',
-        title: 'Redemption Period End',
-        description: '6-month statutory redemption period',
-        date: generateDateString(165),
-        complete: false,
-        caseId: '3',
-        type: 'Statutory',
-      },
-    ],
-    documents: [
-      {
-        id: '2',
-        title: 'Demand Letter',
-        type: 'Demand Letter',
-        createdAt: generateDateString(-85),
-        status: 'Finalized',
-        caseId: '3',
-      },
-      {
-        id: '3',
-        title: 'Petition',
-        type: 'Petition',
-        createdAt: generateDateString(-70),
-        status: 'Filed',
-        caseId: '3',
-      },
-      {
-        id: '4',
-        title: 'Affidavit of Service',
-        type: 'Affidavit',
-        createdAt: generateDateString(-65),
-        status: 'Filed',
-        caseId: '3',
-      },
-      {
-        id: '5',
-        title: 'Order Nisi',
-        type: 'Order Nisi',
-        createdAt: generateDateString(-15),
-        status: 'Filed',
-        caseId: '3',
-      },
-    ],
-    notes: 'Order Nisi granted with standard 6-month redemption period.'
-  },
-  {
-    id: '4',
-    fileNumber: 'FC-2023-004',
-    status: 'Sale Process',
-    property: {
-      id: '4',
-      address: {
-        street: '321 Fir Street',
-        city: 'Richmond',
-        province: 'BC',
-        postalCode: 'V6Y 2B2',
-      },
-      pid: '234-567-890',
-      legalDescription: 'Lot 3, Block C, Plan LMP12345',
-      propertyType: 'Commercial',
-      estimatedValue: 1250000,
-    },
-    mortgage: {
-      id: '4',
-      registrationNumber: 'CA567890',
-      principal: 825000,
-      interestRate: 5.1,
-      startDate: '2017-11-01',
-      paymentAmount: 4475.92,
-      paymentFrequency: 'Monthly',
-      currentBalance: 732450.66,
-      perDiemInterest: 102.56,
-      arrears: 53550,
-    },
-    parties: [
-      {
-        id: '7',
-        name: 'Richmond Business Corp.',
-        type: 'Borrower',
-        contactInfo: {
-          email: 'info@richmondbusiness.com',
-          phone: '604-555-2222',
-          address: '321 Fir Street, Richmond, BC, V6Y 2B2',
-        },
-      },
-      {
-        id: '8',
-        name: 'Pacific Financial',
-        type: 'Lender',
-        contactInfo: {
-          email: 'commercial@pacificfin.com',
-          phone: '604-555-3333',
-          address: '888 Lender Way, Vancouver, BC, V6C 1H2',
-        },
-      },
-    ],
-    createdAt: generateDateString(-270),
-    updatedAt: generateDateString(-30),
-    court: {
-      fileNumber: 'H-98765',
-      registry: 'Vancouver',
-      hearingDate: generateDateString(-180),
-      judgeName: 'Justice Thompson',
-    },
-    deadlines: [
-      {
-        id: '6',
-        title: 'Review Sale Offers',
-        description: 'Review incoming offers for property',
-        date: generateDateString(10),
-        complete: false,
-        caseId: '4',
-        type: 'Internal',
-      },
-      {
-        id: '7',
-        title: 'Court Approval of Sale',
-        description: 'Hearing for approval of sale',
-        date: generateDateString(45),
-        complete: false,
-        caseId: '4',
-        type: 'Court',
-      },
-    ],
-    documents: [
-      {
-        id: '6',
-        title: 'Order Nisi',
-        type: 'Order Nisi',
-        createdAt: generateDateString(-180),
-        status: 'Filed',
-        caseId: '4',
-      },
-      {
-        id: '7',
-        title: 'Conduct of Sale Order',
-        type: 'Conduct of Sale',
-        createdAt: generateDateString(-90),
-        status: 'Filed',
-        caseId: '4',
-      },
-    ],
-    notes: 'Property listed for sale. First offer received but below market value.'
-  },
-];
-
-export const mockRecentActivity: RecentActivity[] = [
-  {
-    id: '1',
-    caseId: '1',
-    action: 'Case Created',
-    timestamp: generateDateString(-5),
-    user: 'Jennifer Lee',
-    details: 'New foreclosure case opened'
-  },
-  {
-    id: '2',
-    caseId: '1',
-    action: 'Document Uploaded',
-    timestamp: generateDateString(-2),
-    user: 'Jennifer Lee',
-    details: 'Mortgage statement uploaded'
-  },
-  {
-    id: '3',
-    caseId: '2',
-    action: 'Status Changed',
-    timestamp: generateDateString(-7),
-    user: 'Robert Chen',
-    details: 'Changed from New to Demand Letter Sent'
-  },
-  {
-    id: '4',
-    caseId: '2',
-    action: 'Document Generated',
-    timestamp: generateDateString(-7),
-    user: 'Robert Chen',
-    details: 'Demand letter generated and sent'
-  },
-  {
-    id: '5',
-    caseId: '3',
-    action: 'Court Date Added',
-    timestamp: generateDateString(-20),
-    user: 'Sarah Johnson',
-    details: 'Hearing scheduled for Order Nisi'
-  },
-  {
-    id: '6',
-    caseId: '3',
-    action: 'Status Changed',
-    timestamp: generateDateString(-15),
-    user: 'Sarah Johnson',
-    details: 'Changed from Petition Filed to Order Nisi Granted'
-  },
-  {
-    id: '7',
-    caseId: '4',
-    action: 'Property Listed',
-    timestamp: generateDateString(-60),
-    user: 'Michael Wong',
-    details: 'Property listed for sale with Realty Group'
-  },
-  {
-    id: '8',
-    caseId: '4',
-    action: 'Offer Received',
-    timestamp: generateDateString(-15),
-    user: 'Michael Wong',
-    details: 'Offer received for $1.1M'
+    pid: "007-234-567",
+    legal_description: "Lot 3, Block C, Plan 23456",
+    propertyType: "Land",
+    estimatedValue: 500000
   }
 ];
 
-export const getStatusColor = (status: string): string => {
-  const statusMap: Record<string, string> = {
-    'New': 'status-new',
-    'Demand Letter Sent': 'status-demand',
-    'Petition Filed': 'status-petition',
-    'Order Nisi Granted': 'status-ordernisi',
-    'Redemption Period': 'status-redemption',
-    'Sale Process': 'status-sale',
-    'Closed': 'status-closed'
-  };
-  
-  return statusMap[status] || 'bg-gray-400';
-};
+// Mock data for parties
+export const mockParties: Party[] = [
+  {
+    id: "party-1",
+    name: "John Smith",
+    type: "Borrower",
+    contactInfo: {
+      email: "john.smith@example.com",
+      phone: "604-123-4567"
+    }
+  },
+  {
+    id: "party-2",
+    name: "Jane Doe",
+    type: "Lender",
+    contactInfo: {
+      email: "jane.doe@example.com",
+      phone: "604-987-6543"
+    }
+  },
+  {
+    id: "party-3",
+    name: "Acme Corp",
+    type: "ThirdParty",
+    contactInfo: {
+      email: "info@acmecorp.com",
+      phone: "604-555-1212"
+    }
+  }
+];
 
-export const getCaseById = (id: string): Case | undefined => {
-  return mockCases.find(c => c.id === id);
-};
+// Mock data for mortgages
+export const mockMortgages: Mortgage[] = [
+  {
+    id: "mortgage-1",
+    registrationNumber: "M123456",
+    principal: 800000,
+    interestRate: 0.035,
+    startDate: "2020-01-15T08:00:00.000Z",
+    paymentAmount: 3500,
+    paymentFrequency: "Monthly",
+    currentBalance: 750000,
+    perDiemInterest: 76.71
+  },
+  {
+    id: "mortgage-2",
+    registrationNumber: "M654321",
+    principal: 500000,
+    interestRate: 0.04,
+    startDate: "2021-05-20T08:00:00.000Z",
+    paymentAmount: 2500,
+    paymentFrequency: "Monthly",
+    currentBalance: 450000,
+    perDiemInterest: 54.79
+  }
+];
+
+// Mock data for deadlines
+export const mockDeadlines: Deadline[] = [
+  {
+    id: "deadline-1",
+    caseId: "case-1",
+    title: "File Petition",
+    description: "File the petition with the court",
+    date: "2023-06-30T08:00:00.000Z",
+    complete: false,
+    type: "Court"
+  },
+  {
+    id: "deadline-2",
+    caseId: "case-1",
+    title: "Serve Defendant",
+    description: "Serve the defendant with the petition",
+    date: "2023-07-15T08:00:00.000Z",
+    complete: false,
+    type: "Statutory"
+  }
+];
+
+// Mock data for documents
+export const mockDocuments: Document[] = [
+  {
+    id: "doc-1",
+    caseId: "case-1",
+    title: "Demand Letter",
+    type: "Demand Letter",
+    createdAt: "2023-05-01T08:00:00.000Z",
+    status: "Finalized",
+    url: "/docs/demand-letter.pdf"
+  },
+  {
+    id: "doc-2",
+    caseId: "case-1",
+    title: "Petition",
+    type: "Petition",
+    createdAt: "2023-06-01T08:00:00.000Z",
+    status: "Draft",
+    url: "/docs/petition.pdf"
+  }
+];
+
+// Mock data for cases
+export const mockCases: Case[] = [
+  {
+    id: "case-1",
+    fileNumber: "MOR-2023-001",
+    status: "Demand Letter Sent",
+    property: {
+      id: "prop-1",
+      address: {
+        street: "123 Main Street",
+        city: "Vancouver",
+        province: "BC",
+        postalCode: "V6K 1P3"
+      },
+      pid: "005-123-456",
+      legal_description: "Lot 1, Block A, Plan 12345",
+      propertyType: "Residential",
+      estimatedValue: 950000
+    },
+    mortgage: {
+      id: "mortgage-1",
+      registrationNumber: "M123456",
+      principal: 800000,
+      interestRate: 0.035,
+      startDate: "2020-01-15T08:00:00.000Z",
+      paymentAmount: 3500,
+      paymentFrequency: "Monthly",
+      currentBalance: 750000,
+      perDiemInterest: 76.71
+    },
+    parties: [
+      {
+        id: "party-1",
+        name: "John Smith",
+        type: "Borrower",
+        contactInfo: {
+          email: "john.smith@example.com",
+          phone: "604-123-4567"
+        }
+      },
+      {
+        id: "party-2",
+        name: "Jane Doe",
+        type: "Lender",
+        contactInfo: {
+          email: "jane.doe@example.com",
+          phone: "604-987-6543"
+        }
+      }
+    ],
+    createdAt: "2023-05-01T08:00:00.000Z",
+    updatedAt: "2023-05-15T08:00:00.000Z",
+    deadlines: [
+      {
+        id: "deadline-1",
+        caseId: "case-1",
+        title: "File Petition",
+        description: "File the petition with the court",
+        date: "2023-06-30T08:00:00.000Z",
+        complete: false,
+        type: "Court"
+      }
+    ],
+    documents: [
+      {
+        id: "doc-1",
+        caseId: "case-1",
+        title: "Demand Letter",
+        type: "Demand Letter",
+        createdAt: "2023-05-01T08:00:00.000Z",
+        status: "Finalized",
+        url: "/docs/demand-letter.pdf"
+      }
+    ]
+  },
+  {
+    id: "case-2",
+    fileNumber: "MOR-2023-002",
+    status: "Petition Filed",
+    property: {
+      id: "prop-2",
+      address: {
+        street: "456 Oak Avenue",
+        city: "Burnaby",
+        province: "BC",
+        postalCode: "V5G 2H4"
+      },
+      pid: "006-789-012",
+      legal_description: "Lot 2, Block B, Plan 67890",
+      propertyType: "Commercial",
+      estimatedValue: 1200000
+    },
+    mortgage: {
+      id: "mortgage-2",
+      registrationNumber: "M654321",
+      principal: 500000,
+      interestRate: 0.04,
+      startDate: "2021-05-20T08:00:00.000Z",
+      paymentAmount: 2500,
+      paymentFrequency: "Monthly",
+      currentBalance: 450000,
+      perDiemInterest: 54.79
+    },
+    parties: [
+      {
+        id: "party-3",
+        name: "Acme Corp",
+        type: "ThirdParty",
+        contactInfo: {
+          email: "info@acmecorp.com",
+          phone: "604-555-1212"
+        }
+      }
+    ],
+    createdAt: "2023-06-01T08:00:00.000Z",
+    updatedAt: "2023-06-15T08:00:00.000Z",
+    deadlines: [
+      {
+        id: "deadline-2",
+        caseId: "case-2",
+        title: "Serve Defendant",
+        description: "Serve the defendant with the petition",
+        date: "2023-07-15T08:00:00.000Z",
+        complete: false,
+        type: "Statutory"
+      }
+    ],
+    documents: [
+      {
+        id: "doc-2",
+        caseId: "case-2",
+        title: "Petition",
+        type: "Petition",
+        createdAt: "2023-06-01T08:00:00.000Z",
+        status: "Draft",
+        url: "/docs/petition.pdf"
+      }
+    ]
+  }
+];
+
+export const mockRecentActivities: RecentActivity[] = [
+  {
+    id: "activity-1",
+    caseId: "case-1",
+    action: "Demand letter sent",
+    timestamp: "2023-07-20T14:30:00.000Z",
+    user: "John Doe",
+    details: "Demand letter was sent to John Smith."
+  },
+  {
+    id: "activity-2",
+    caseId: "case-2",
+    action: "Petition filed",
+    timestamp: "2023-07-21T09:15:00.000Z",
+    user: "Jane Smith",
+    details: "Petition was filed with the court."
+  },
+  {
+    id: "activity-3",
+    caseId: "case-1",
+    action: "Deadline approaching",
+    timestamp: "2023-07-22T16:45:00.000Z",
+    user: "System",
+    details: "Deadline for serving defendant is approaching."
+  }
+];
+
+export const mockLawFirms: LawFirm[] = [
+  {
+    id: 'lf-1',
+    name: 'Smith & Jones Law',
+    subscriptionTier: 'standard',
+    subscriptionStatus: 'active',
+    subscriptionStartDate: '2023-01-01T00:00:00.000Z',
+    subscriptionEndDate: '2023-12-31T00:00:00.000Z',
+    settings: {
+      notificationsEnabled: true,
+      theme: 'dark'
+    },
+    logoUrl: '/logos/smith-jones-law.png',
+    contactEmail: 'info@smithjoneslaw.com',
+    contactPhone: '604-555-5555',
+    address: '123 Main St, Vancouver, BC',
+    enabled: true,
+    createdAt: '2023-01-01T00:00:00.000Z',
+    updatedAt: '2023-07-23T12:00:00.000Z'
+  },
+  {
+    id: 'lf-2',
+    name: 'Legal Solutions Inc.',
+    subscriptionTier: 'premium',
+    subscriptionStatus: 'active',
+    subscriptionStartDate: '2023-02-15T00:00:00.000Z',
+    subscriptionEndDate: '2024-02-14T00:00:00.000Z',
+    settings: {
+      notificationsEnabled: false,
+      theme: 'light'
+    },
+    logoUrl: '/logos/legal-solutions.png',
+    contactEmail: 'contact@legalsolutions.com',
+    contactPhone: '604-555-1234',
+    address: '456 Oak Ave, Burnaby, BC',
+    enabled: true,
+    createdAt: '2023-02-15T00:00:00.000Z',
+    updatedAt: '2023-07-23T12:00:00.000Z'
+  }
+];
+
+export const mockUserProfiles: UserProfile[] = [
+  {
+    id: 'user-1',
+    lawFirmId: 'lf-1',
+    firstName: 'Alice',
+    lastName: 'Smith',
+    role: 'admin',
+    email: 'alice.smith@smithjoneslaw.com',
+    avatarUrl: '/avatars/alice.png',
+    createdAt: '2023-01-05T00:00:00.000Z',
+    updatedAt: '2023-07-23T12:00:00.000Z',
+    lawFirmName: 'Smith & Jones Law'
+  },
+  {
+    id: 'user-2',
+    lawFirmId: 'lf-1',
+    firstName: 'Bob',
+    lastName: 'Johnson',
+    role: 'staff',
+    email: 'bob.johnson@smithjoneslaw.com',
+    avatarUrl: '/avatars/bob.png',
+    createdAt: '2023-02-01T00:00:00.000Z',
+    updatedAt: '2023-07-23T12:00:00.000Z',
+    lawFirmName: 'Smith & Jones Law'
+  },
+  {
+    id: 'user-3',
+    lawFirmId: 'lf-2',
+    firstName: 'Charlie',
+    lastName: 'Brown',
+    role: 'manager',
+    email: 'charlie.brown@legalsolutions.com',
+    avatarUrl: '/avatars/charlie.png',
+    createdAt: '2023-03-10T00:00:00.000Z',
+    updatedAt: '2023-07-23T12:00:00.000Z',
+    lawFirmName: 'Legal Solutions Inc.'
+  }
+];
