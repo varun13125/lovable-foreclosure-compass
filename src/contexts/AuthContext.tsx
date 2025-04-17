@@ -1,4 +1,3 @@
-
 import { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState, UserProfile } from '@/types';
@@ -22,7 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setAuthState(prevState => ({ ...prevState, session }));
@@ -80,14 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         setAuthState(prevState => ({ ...prevState, loading: false }));
         return;
       }
 
-      // Session exists, now fetch the user profile
       setTimeout(async () => {
         try {
           const { data: profile, error } = await supabase
@@ -141,12 +137,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     setAuthState(prevState => ({ ...prevState, loading: true }));
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    
     if (error) {
       setAuthState(prevState => ({ ...prevState, loading: false }));
       toast.error(error.message);
+      return { error };
     }
-    return { error };
+
+    if (data.user) {
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        const adminEmails = ['admin@example.com', 'varunchaudhry.ai@gmail.com'];
+        if (adminEmails.includes(email) && profile.role !== 'system_admin') {
+          await supabase
+            .from('profiles')
+            .update({ role: 'system_admin' })
+            .eq('id', data.user.id);
+          
+          toast.success('Promoted to system admin');
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    }
+
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
