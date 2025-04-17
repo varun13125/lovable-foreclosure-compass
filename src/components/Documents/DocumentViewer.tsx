@@ -134,6 +134,16 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
     }
   };
 
+  // Get the appropriate background color for the status badge
+  const getStatusBadgeVariant = (status: string) => {
+    switch(status) {
+      case 'Finalized': return 'default';
+      case 'Filed': return 'success';
+      case 'Served': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -142,7 +152,7 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
             <FileText className="h-5 w-5 text-law-teal" />
             <CardTitle className="text-lg">{document.title}</CardTitle>
           </div>
-          <Badge variant={document.status === "Draft" ? "outline" : "default"}>
+          <Badge variant={getStatusBadgeVariant(document.status)}>
             {document.status}
           </Badge>
         </div>

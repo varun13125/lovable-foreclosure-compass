@@ -1,3 +1,4 @@
+
 export type CaseStatus = 
   | 'New' 
   | 'Demand Letter Sent' 
@@ -58,12 +59,12 @@ export interface Deadline {
 export interface Document {
   id: string;
   title: string;
-  type: "Demand Letter" | "Petition" | "Order Nisi" | "Conduct of Sale" | "Other";
+  type: "Demand Letter" | "Petition" | "Order Nisi" | "Conduct of Sale" | "Affidavit" | "Final Order" | "Other";
   createdAt: string;
-  status: "Draft" | "Finalized";
+  status: "Draft" | "Finalized" | "Filed" | "Served";
   caseId: string;
   url?: string;
-  caseNumber?: string; // Add this property to fix errors
+  caseNumber?: string; // Used to display case file number with documents
 }
 
 export interface Case {
@@ -93,4 +94,46 @@ export interface RecentActivity {
   timestamp: string; // ISO date string
   user: string;
   details?: string;
+}
+
+// Law firm management related interfaces
+export interface LawFirm {
+  id: string;
+  name: string;
+  subscriptionTier: 'basic' | 'standard' | 'premium' | 'enterprise';
+  subscriptionStatus: string;
+  subscriptionStartDate: string; // ISO date string
+  subscriptionEndDate?: string; // ISO date string
+  settings?: Record<string, any>;
+  logoUrl?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  enabled: boolean;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+}
+
+export interface UserProfile {
+  id: string;
+  lawFirmId?: string;
+  firstName?: string;
+  lastName?: string;
+  role: 'admin' | 'manager' | 'staff' | 'client' | 'system_admin';
+  email: string;
+  avatarUrl?: string;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+}
+
+export interface Feature {
+  id: string;
+  name: string;
+  description?: string;
+  basicEnabled: boolean;
+  standardEnabled: boolean;
+  premiumEnabled: boolean;
+  enterpriseEnabled: boolean;
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string;
 }

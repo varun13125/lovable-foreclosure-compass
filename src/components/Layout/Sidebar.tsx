@@ -1,4 +1,6 @@
+
 import { Link, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { 
   BarChart2, 
@@ -8,8 +10,10 @@ import {
   Home, 
   MessageSquare,
   Settings, 
-  Users 
+  Users,
+  Shield
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -48,6 +52,44 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
 }
 
 export default function Sidebar() {
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>('User');
+  
+  useEffect(() => {
+    getUserInfo();
+  }, []);
+  
+  const getUserInfo = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role, first_name, last_name')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          setUserRole(data.role);
+          
+          if (data.first_name || data.last_name) {
+            const displayName = [data.first_name, data.last_name]
+              .filter(Boolean)
+              .join(' ');
+            setUserName(displayName || user.email || 'User');
+          } else if (user.email) {
+            setUserName(user.email);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error getting user info:", error);
+    }
+  };
+
   const sidebarNavItems = [
     {
       title: "Dashboard",
@@ -88,8 +130,17 @@ export default function Sidebar() {
       title: "Settings",
       href: "/settings",
       icon: Settings,
-    },
+    }
   ];
+  
+  // Add admin link for system_admin users
+  if (userRole === 'system_admin') {
+    sidebarNavItems.push({
+      title: "Administration",
+      href: "/admin",
+      icon: Shield,
+    });
+  }
 
   return (
     <div className="hidden md:flex h-screen w-64 flex-col bg-sidebar fixed inset-y-0">
@@ -105,11 +156,17 @@ export default function Sidebar() {
       <div className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3 p-2">
           <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <span className="text-sidebar-foreground font-semibold">JL</span>
+            <span className="text-sidebar-foreground font-semibold">
+              {userName.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2)}
+            </span>
           </div>
           <div className="flex flex-col">
-            <span className="font-medium text-sm text-sidebar-foreground">Jennifer Lee</span>
-            <span className="text-xs text-sidebar-foreground/60">Associate</span>
+            <span className="font-medium text-sm text-sidebar-foreground">{userName}</span>
+            <span className="text-xs text-sidebar-foreground/60">
+              {userRole === 'system_admin' 
+                ? 'System Administrator' 
+                : userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+            </span>
           </div>
         </div>
       </div>

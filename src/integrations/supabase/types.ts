@@ -89,6 +89,7 @@ export type Database = {
           hearing_date: string | null
           id: string
           judge_name: string | null
+          law_firm_id: string | null
           mortgage_id: string
           notes: string | null
           property_id: string
@@ -103,6 +104,7 @@ export type Database = {
           hearing_date?: string | null
           id?: string
           judge_name?: string | null
+          law_firm_id?: string | null
           mortgage_id: string
           notes?: string | null
           property_id: string
@@ -117,6 +119,7 @@ export type Database = {
           hearing_date?: string | null
           id?: string
           judge_name?: string | null
+          law_firm_id?: string | null
           mortgage_id?: string
           notes?: string | null
           property_id?: string
@@ -124,6 +127,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "cases_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cases_mortgage_id_fkey"
             columns: ["mortgage_id"]
@@ -190,6 +200,7 @@ export type Database = {
           content: string | null
           created_at: string
           id: string
+          law_firm_id: string | null
           status: Database["public"]["Enums"]["document_status"]
           title: string
           type: Database["public"]["Enums"]["document_type"]
@@ -201,6 +212,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          law_firm_id?: string | null
           status?: Database["public"]["Enums"]["document_status"]
           title: string
           type: Database["public"]["Enums"]["document_type"]
@@ -212,6 +224,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          law_firm_id?: string | null
           status?: Database["public"]["Enums"]["document_status"]
           title?: string
           type?: Database["public"]["Enums"]["document_type"]
@@ -226,7 +239,101 @@ export type Database = {
             referencedRelation: "cases"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "documents_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      features: {
+        Row: {
+          basic_enabled: boolean
+          created_at: string
+          description: string | null
+          enterprise_enabled: boolean
+          id: string
+          name: string
+          premium_enabled: boolean
+          standard_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          basic_enabled?: boolean
+          created_at?: string
+          description?: string | null
+          enterprise_enabled?: boolean
+          id?: string
+          name: string
+          premium_enabled?: boolean
+          standard_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          basic_enabled?: boolean
+          created_at?: string
+          description?: string | null
+          enterprise_enabled?: boolean
+          id?: string
+          name?: string
+          premium_enabled?: boolean
+          standard_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      law_firms: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          logo_url: string | null
+          name: string
+          settings: Json | null
+          subscription_end_date: string | null
+          subscription_start_date: string
+          subscription_status: string
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          logo_url?: string | null
+          name: string
+          settings?: Json | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string
+          subscription_status?: string
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          logo_url?: string | null
+          name?: string
+          settings?: Json | null
+          subscription_end_date?: string | null
+          subscription_start_date?: string
+          subscription_status?: string
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       mortgages: {
         Row: {
@@ -235,6 +342,7 @@ export type Database = {
           current_balance: number
           id: string
           interest_rate: number
+          law_firm_id: string | null
           payment_amount: number | null
           payment_frequency:
             | Database["public"]["Enums"]["payment_frequency"]
@@ -251,6 +359,7 @@ export type Database = {
           current_balance: number
           id?: string
           interest_rate: number
+          law_firm_id?: string | null
           payment_amount?: number | null
           payment_frequency?:
             | Database["public"]["Enums"]["payment_frequency"]
@@ -267,6 +376,7 @@ export type Database = {
           current_balance?: number
           id?: string
           interest_rate?: number
+          law_firm_id?: string | null
           payment_amount?: number | null
           payment_frequency?:
             | Database["public"]["Enums"]["payment_frequency"]
@@ -277,7 +387,15 @@ export type Database = {
           start_date?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mortgages_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parties: {
         Row: {
@@ -285,6 +403,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          law_firm_id: string | null
           name: string
           phone: string | null
           type: Database["public"]["Enums"]["party_type"]
@@ -295,6 +414,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          law_firm_id?: string | null
           name: string
           phone?: string | null
           type: Database["public"]["Enums"]["party_type"]
@@ -305,12 +425,65 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          law_firm_id?: string | null
           name?: string
           phone?: string | null
           type?: Database["public"]["Enums"]["party_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "parties_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          law_firm_id: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          law_firm_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          law_firm_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       properties: {
         Row: {
@@ -318,6 +491,7 @@ export type Database = {
           created_at: string
           estimated_value: number | null
           id: string
+          law_firm_id: string | null
           legal_description: string | null
           pid: string | null
           postal_code: string | null
@@ -331,6 +505,7 @@ export type Database = {
           created_at?: string
           estimated_value?: number | null
           id?: string
+          law_firm_id?: string | null
           legal_description?: string | null
           pid?: string | null
           postal_code?: string | null
@@ -344,6 +519,7 @@ export type Database = {
           created_at?: string
           estimated_value?: number | null
           id?: string
+          law_firm_id?: string | null
           legal_description?: string | null
           pid?: string | null
           postal_code?: string | null
@@ -352,14 +528,33 @@ export type Database = {
           street?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "properties_law_firm_id_fkey"
+            columns: ["law_firm_id"]
+            isOneToOne: false
+            referencedRelation: "law_firms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      can_access_feature: {
+        Args: { user_id: string; feature_name: string }
+        Returns: boolean
+      }
+      get_user_law_firm_id: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
       case_status:
@@ -383,6 +578,8 @@ export type Database = {
       party_type: "Borrower" | "Lender" | "ThirdParty" | "Lawyer" | "Client"
       payment_frequency: "Monthly" | "Bi-weekly" | "Weekly"
       property_type: "Residential" | "Commercial" | "Land" | "Other"
+      subscription_tier: "basic" | "standard" | "premium" | "enterprise"
+      user_role: "admin" | "manager" | "staff" | "client" | "system_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -521,6 +718,8 @@ export const Constants = {
       party_type: ["Borrower", "Lender", "ThirdParty", "Lawyer", "Client"],
       payment_frequency: ["Monthly", "Bi-weekly", "Weekly"],
       property_type: ["Residential", "Commercial", "Land", "Other"],
+      subscription_tier: ["basic", "standard", "premium", "enterprise"],
+      user_role: ["admin", "manager", "staff", "client", "system_admin"],
     },
   },
 } as const
