@@ -28,7 +28,7 @@ export interface Property {
     postalCode: string;
   };
   pid: string; // Property ID
-  legal_description: string; // This is the correct field name - keep consistent
+  legal_description: string; // Using snake_case to be consistent with the database
   propertyType: 'Residential' | 'Commercial' | 'Land' | 'Other';
   estimatedValue?: number;
 }

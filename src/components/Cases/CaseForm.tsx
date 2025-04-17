@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +43,7 @@ const CaseForm: React.FC<CaseFormProps> = ({ initialData, caseData, onCancel, on
   const [propertyType, setPropertyType] = useState<'Residential' | 'Commercial' | 'Land' | 'Other'>(
     (data?.property?.propertyType as 'Residential' | 'Commercial' | 'Land' | 'Other') || 'Residential'
   );
-  const [legalDescription, setLegalDescription] = useState(data?.property?.legalDescription || '');
+  const [legalDescription, setLegalDescription] = useState(data?.property?.legal_description || '');
   const [pid, setPid] = useState(data?.property?.pid || '');
   
   // Mortgage fields

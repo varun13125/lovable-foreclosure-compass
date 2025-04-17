@@ -34,7 +34,9 @@ export default function CaseList() {
             city,
             province,
             postal_code,
-            property_type
+            property_type,
+            legal_description,
+            pid
           ),
           parties: case_parties (
             party: parties (
@@ -72,8 +74,8 @@ export default function CaseList() {
             province: caseItem.property.province || '',
             postalCode: caseItem.property.postal_code || ''
           },
-          pid: '',
-          legalDescription: '',
+          pid: caseItem.property.pid || '',
+          legal_description: caseItem.property.legal_description || '',
           propertyType: caseItem.property.property_type || 'Residential'
         },
         parties: caseItem.parties.map(cp => ({
