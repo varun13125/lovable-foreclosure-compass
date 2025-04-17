@@ -1,5 +1,5 @@
 
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { 
@@ -11,9 +11,18 @@ import {
   MessageSquare,
   Settings, 
   Users,
-  Shield
+  Shield,
+  LogOut
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -52,42 +61,27 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
 }
 
 export default function Sidebar() {
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { authState, signOut } = useAuth();
+  const navigate = useNavigate();
   const [userName, setUserName] = useState<string>('User');
   
   useEffect(() => {
-    getUserInfo();
-  }, []);
-  
-  const getUserInfo = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role, first_name, last_name')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) throw error;
-        
-        if (data) {
-          setUserRole(data.role);
-          
-          if (data.first_name || data.last_name) {
-            const displayName = [data.first_name, data.last_name]
-              .filter(Boolean)
-              .join(' ');
-            setUserName(displayName || user.email || 'User');
-          } else if (user.email) {
-            setUserName(user.email);
-          }
-        }
+    // Set user display name from auth state
+    if (authState.user) {
+      if (authState.user.firstName || authState.user.lastName) {
+        const displayName = [authState.user.firstName, authState.user.lastName]
+          .filter(Boolean)
+          .join(' ');
+        setUserName(displayName || authState.user.email || 'User');
+      } else if (authState.user.email) {
+        setUserName(authState.user.email);
       }
-    } catch (error) {
-      console.error("Error getting user info:", error);
     }
+  }, [authState.user]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
   };
 
   const sidebarNavItems = [
@@ -134,7 +128,7 @@ export default function Sidebar() {
   ];
   
   // Add admin link for system_admin users
-  if (userRole === 'system_admin') {
+  if (authState.user?.role === 'system_admin') {
     sidebarNavItems.push({
       title: "Administration",
       href: "/admin",
@@ -168,22 +162,37 @@ export default function Sidebar() {
         <SidebarNav items={sidebarNavItems} />
       </div>
       <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3 p-2">
-          <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-            <span className="text-sidebar-foreground font-semibold">
-              {getUserInitials()}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-medium text-sm text-sidebar-foreground">{userName}</span>
-            <span className="text-xs text-sidebar-foreground/60">
-              {userRole ? (userRole === 'system_admin' 
-                ? 'System Administrator' 
-                : userRole.charAt(0).toUpperCase() + userRole.slice(1))
-                : 'User'}
-            </span>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="w-full">
+            <div className="flex items-center gap-3 p-2 hover:bg-sidebar-accent rounded-md transition-colors">
+              <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
+                <span className="text-sidebar-foreground font-semibold">
+                  {getUserInitials()}
+                </span>
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="font-medium text-sm text-sidebar-foreground">{userName}</span>
+                <span className="text-xs text-sidebar-foreground/60">
+                  {authState.user?.role ? (authState.user.role === 'system_admin' 
+                    ? 'System Administrator' 
+                    : authState.user.role.charAt(0).toUpperCase() + authState.user.role.slice(1))
+                    : 'User'}
+                </span>
+              </div>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sign Out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

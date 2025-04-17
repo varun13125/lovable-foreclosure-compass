@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, Shield, Users, BarChart3, Scale, ArrowRight } from "lucide-react";
+import { CheckCircle2, Shield, Users, BarChart3, Scale, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { authState, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
@@ -21,10 +23,16 @@ export default function Landing() {
       return;
     }
     
-    // For demo purposes, just navigate to the dashboard
-    toast.success("Login successful");
-    navigate("/dashboard");
+    const { error } = await signIn(email, password);
+    if (!error) {
+      navigate("/dashboard");
+    }
   };
+
+  // If user is already authenticated, redirect to dashboard
+  if (authState.user) {
+    navigate("/dashboard");
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-law-navy to-law-navy/80">
@@ -57,9 +65,9 @@ export default function Landing() {
               <Button 
                 size="lg" 
                 className="bg-law-teal hover:bg-law-teal/90 text-white px-8"
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/auth")}
               >
-                Try Demo
+                Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button 
@@ -107,13 +115,24 @@ export default function Landing() {
                     />
                   </div>
                   
-                  <Button type="submit" className="w-full bg-law-navy hover:bg-law-navy/90">
-                    Sign In
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-law-navy hover:bg-law-navy/90"
+                    disabled={authState.loading}
+                  >
+                    {authState.loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing In...
+                      </>
+                    ) : (
+                      "Sign In"
+                    )}
                   </Button>
                 </form>
                 
                 <div className="mt-6 text-center text-sm">
-                  <p>Don't have an account? <a href="#" className="text-law-teal hover:underline">Contact us</a></p>
+                  <p>Don't have an account? <a href="/auth?tab=register" className="text-law-teal hover:underline">Sign up</a></p>
                 </div>
               </CardContent>
             </Card>

@@ -1,3 +1,4 @@
+
 export type CaseStatus = 
   | 'New' 
   | 'Demand Letter Sent' 
@@ -27,7 +28,7 @@ export interface Property {
     postalCode: string;
   };
   pid: string; // Property ID
-  legal_description: string; // Changed from legalDescription for consistency with database
+  legal_description: string; // This is the correct field name
   propertyType: 'Residential' | 'Commercial' | 'Land' | 'Other';
   estimatedValue?: number;
 }
@@ -103,7 +104,7 @@ export interface LawFirm {
   subscriptionStatus: string;
   subscriptionStartDate: string; // ISO date string
   subscriptionEndDate?: string; // ISO date string
-  settings?: Record<string, any>; // Changed from Record<string, any> to handle JSON from DB
+  settings?: Record<string, any>;
   logoUrl?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -136,4 +137,11 @@ export interface Feature {
   enterpriseEnabled: boolean;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string;
+}
+
+// Add authentication related interfaces
+export interface AuthState {
+  user: UserProfile | null;
+  session: any | null;
+  loading: boolean;
 }
