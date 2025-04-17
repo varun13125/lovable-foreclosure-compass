@@ -28,7 +28,7 @@ export interface Property {
     postalCode: string;
   };
   pid: string; // Property ID
-  legal_description: string; // This is the correct field name
+  legal_description: string; // This is the correct field name - keep consistent
   propertyType: 'Residential' | 'Commercial' | 'Land' | 'Other';
   estimatedValue?: number;
 }
@@ -64,6 +64,7 @@ export interface Document {
   status: "Draft" | "Finalized" | "Filed" | "Served";
   caseId: string;
   url?: string;
+  content?: string; // Add content field to match usage in DocumentViewer
   caseNumber?: string; // Used to display case file number with documents
 }
 

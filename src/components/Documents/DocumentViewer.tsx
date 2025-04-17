@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   Card,
@@ -15,9 +16,11 @@ import { format } from 'date-fns';
 
 interface DocumentViewerProps {
   document: Document;
+  content?: string; // Make content optional to match usage in ViewDocument
+  onStatusChange?: () => void; // Add onStatusChange as an optional prop
 }
 
-const DocumentViewer: React.FC<DocumentViewerProps> = ({ document }) => {
+const DocumentViewer: React.FC<DocumentViewerProps> = ({ document, content, onStatusChange }) => {
   const { title, type, createdAt, status, caseNumber } = document;
 
   const getStatusBadge = (status: string) => {
