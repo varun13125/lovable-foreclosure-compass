@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Layout/Header";
@@ -82,7 +81,7 @@ export default function Admin() {
           subscriptionStatus: firm.subscription_status,
           subscriptionStartDate: firm.subscription_start_date,
           subscriptionEndDate: firm.subscription_end_date,
-          settings: firm.settings,
+          settings: firm.settings as Record<string, any>,
           logoUrl: firm.logo_url,
           contactEmail: firm.contact_email,
           contactPhone: firm.contact_phone,

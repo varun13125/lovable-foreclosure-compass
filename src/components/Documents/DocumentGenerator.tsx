@@ -150,7 +150,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
               postalCode: item.property?.postal_code || ''
             },
             pid: '',
-            legalDescription: '',
+            legal_description: '',
             propertyType: item.property?.property_type || 'Residential'
           },
           parties: [],
@@ -290,7 +290,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
             postalCode: caseData.property.postal_code || ''
           },
           pid: caseData.property.pid || '',
-          legalDescription: caseData.property.legalDescription || '',
+          legal_description: caseData.property.legal_description || '',
           propertyType: caseData.property.property_type
         },
         mortgage: {
@@ -412,7 +412,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
       '{property.province}': caseData.property.address.province,
       '{property.postal_code}': caseData.property.address.postalCode,
       '{property.pid}': caseData.property.pid || "[PID]",
-      '{property.legal_description}': caseData.property.legalDescription || "[Legal Description]",
+      '{property.legal_description}': caseData.property.legal_description || "[Legal Description]",
       '{mortgage.number}': caseData.mortgage.registrationNumber,
       '{mortgage.principal}': formatCurrency(caseData.mortgage.principal),
       '{mortgage.interest_rate}': `${caseData.mortgage.interestRate}%`,
@@ -424,7 +424,7 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
       '{court.file_number}': caseData.court?.fileNumber || "[Court File Number]",
       '{court.registry}': caseData.court?.registry || "Vancouver",
       '{court.hearing_date}': formatDate(caseData.court?.hearingDate),
-      '{court.judge_name}': caseData.court?.judgeName || "[Judge Name]",
+      '{court.judge_name}': caseData.court?.judge_name || "[Judge Name]",
       '{borrower.name}': borrower?.name || "[BORROWER NAME]",
       '{borrower.address}': borrower?.contactInfo?.address || "[BORROWER ADDRESS]",
       '{borrower.email}': borrower?.contactInfo?.email || "",
@@ -582,7 +582,7 @@ THE PETITIONER CLAIMS:
 
 1. An Order Nisi of Foreclosure with respect to the lands and premises legally described as:
    PID: ${caseData.property.pid || "[PID]"}
-   ${caseData.property.legalDescription || "[LEGAL DESCRIPTION]"}
+   ${caseData.property.legal_description || "[LEGAL DESCRIPTION]"}
    (the "Property")
 
 2. A declaration that as at ${formatDateString()}, the Respondent is indebted to the Petitioner under the mortgage in the amount of ${formatCurrency(caseData.mortgage.currentBalance)}.
@@ -672,7 +672,7 @@ TAKE NOTICE that an application will be made by the Petitioner to the presiding 
 
 1. The Petitioner shall have conduct of sale of the lands and premises legally described as:
    PID: ${caseData.property.pid || "[PID]"}
-   ${caseData.property.legalDescription || "[LEGAL DESCRIPTION]"}
+   ${caseData.property.legal_description || "[LEGAL DESCRIPTION]"}
    (the "Property")
 
 2. The Property shall be listed for sale on the Multiple Listing Service with a licensed real estate agent chosen by the Petitioner;

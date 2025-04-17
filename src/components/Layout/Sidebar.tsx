@@ -142,6 +142,20 @@ export default function Sidebar() {
     });
   }
 
+  // Generate user initials safely with null checks
+  const getUserInitials = () => {
+    if (!userName) return 'U';
+    
+    const nameParts = userName.split(' ').filter(Boolean);
+    if (nameParts.length === 0) return 'U';
+    
+    if (nameParts.length === 1) {
+      return nameParts[0].charAt(0).toUpperCase();
+    }
+    
+    return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+  };
+
   return (
     <div className="hidden md:flex h-screen w-64 flex-col bg-sidebar fixed inset-y-0">
       <div className="flex h-16 items-center border-b border-sidebar-border px-6">
@@ -157,15 +171,16 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 p-2">
           <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center">
             <span className="text-sidebar-foreground font-semibold">
-              {userName.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2)}
+              {getUserInitials()}
             </span>
           </div>
           <div className="flex flex-col">
             <span className="font-medium text-sm text-sidebar-foreground">{userName}</span>
             <span className="text-xs text-sidebar-foreground/60">
-              {userRole === 'system_admin' 
+              {userRole ? (userRole === 'system_admin' 
                 ? 'System Administrator' 
-                : userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                : userRole.charAt(0).toUpperCase() + userRole.slice(1))
+                : 'User'}
             </span>
           </div>
         </div>

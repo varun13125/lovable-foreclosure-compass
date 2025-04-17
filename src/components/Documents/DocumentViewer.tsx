@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,10 +25,7 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
     setLoading(true);
     
     try {
-      // Create a Blob containing the document content
       const blob = new Blob([content], { type: "text/plain" });
-      
-      // Create download link
       const url = URL.createObjectURL(blob);
       const a = window.document.createElement("a");
       a.href = url;
@@ -37,7 +33,6 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
       window.document.body.appendChild(a);
       a.click();
       
-      // Clean up
       window.document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
@@ -57,7 +52,6 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
     }
     
     try {
-      // Open a new window with formatted content
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
@@ -112,7 +106,6 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
     setLoading(true);
     
     try {
-      // Update document status in database
       const { error } = await supabase
         .from('documents')
         .update({ status: 'Finalized' })
@@ -122,7 +115,6 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
       
       toast.success("Document status updated to 'Finalized'");
       
-      // Call the onStatusChange callback if provided
       if (onStatusChange) {
         onStatusChange();
       }
@@ -134,7 +126,6 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
     }
   };
 
-  // Get the appropriate background color for the status badge
   const getStatusBadgeVariant = (status: string) => {
     switch(status) {
       case 'Finalized': return 'default';
@@ -173,6 +164,15 @@ const DocumentViewer = ({ document, content, onStatusChange }: DocumentViewerPro
                 >
                   <Save className="h-4 w-4" />
                   Save Final
+                </Button>
+              )}
+              {document.status !== "Finalized" && (
+                <Button
+                  variant="outline"
+                  className="bg-green-50 text-green-600 hover:bg-green-100 border-green-200"
+                  onClick={handleFinalize}
+                >
+                  Finalize Document
                 </Button>
               )}
               <Button
