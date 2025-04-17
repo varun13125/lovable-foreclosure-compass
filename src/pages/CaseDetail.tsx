@@ -23,7 +23,7 @@ import Header from "@/components/Layout/Header";
 import Sidebar from "@/components/Layout/Sidebar";
 import DocumentGenerator from "@/components/Documents/DocumentGenerator";
 import { getStatusColor } from "@/data/mockData";
-import { Case, CaseStatus, Deadline, Party } from "@/types";
+import { Case, CaseStatus, Deadline, Party, Property } from "@/types";
 import CaseTimeline from "@/components/Cases/CaseTimeline";
 import CaseDeadlines from "@/components/Cases/CaseDeadlines";
 import CaseFinancials from "@/components/Cases/CaseFinancials";
@@ -75,8 +75,8 @@ export default function CaseDetail() {
           updated_at,
           notes,
           court_file_number,
-          hearing_date,
           court_registry,
+          hearing_date,
           judge_name,
           property: properties (
             id,
@@ -129,16 +129,16 @@ export default function CaseDetail() {
       }
 
       const newProperty: Property = {
-        id: uuidv4(),
+        id: data.property?.id || uuidv4(),
         address: {
-          street: data.property?.address?.street || "",
-          city: data.property?.address?.city || "",
-          province: data.property?.address?.province || "",
-          postalCode: data.property?.address?.postalCode || "",
+          street: data.property?.street || "",
+          city: data.property?.city || "",
+          province: data.property?.province || "",
+          postalCode: data.property?.postal_code || "",
         },
         pid: data.property?.pid || "",
         legal_description: data.property?.legal_description || "",
-        propertyType: data.property?.propertyType || "Residential",
+        propertyType: data.property?.property_type || "Residential",
       };
 
       const transformedCase: Case = {
@@ -580,7 +580,7 @@ export default function CaseDetail() {
                   <CardTitle>Case Documents</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <DocumentGenerator caseId={activeCase.id} />
+                  <DocumentGenerator selectedCase={activeCase} />
                 </CardContent>
               </Card>
             </TabsContent>

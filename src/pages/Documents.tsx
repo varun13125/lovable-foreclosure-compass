@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Search, Eye, Plus, Filter } from "lucide-react";
-import { Document } from "@/types";
+import { Document, Case } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
@@ -27,6 +27,7 @@ export default function Documents() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   
   useEffect(() => {
     fetchDocuments();
@@ -153,7 +154,7 @@ export default function Documents() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <DocumentGenerator />
+                  <DocumentGenerator selectedCase={null} />
                 </CardContent>
               </Card>
             </div>

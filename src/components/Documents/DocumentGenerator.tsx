@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -9,20 +10,134 @@ import { format, parseISO } from 'date-fns';
 
 interface DocumentGeneratorProps {
   selectedCase: Case | null;
+  caseId?: string; // Add caseId as an optional property
 }
 
-const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) => {
+const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, caseId }) => {
   const [documentType, setDocumentType] = useState<string>('Demand Letter');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [currentCase, setCurrentCase] = useState<Case | null>(selectedCase);
 
   useEffect(() => {
     if (selectedCase) {
+      setCurrentCase(selectedCase);
       console.log("Selected Case in DocumentGenerator:", selectedCase);
+    } else if (caseId) {
+      // Fetch case data if caseId is provided but no selectedCase
+      fetchCaseById(caseId);
     }
-  }, [selectedCase]);
+  }, [selectedCase, caseId]);
+
+  const fetchCaseById = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('cases')
+        .select(`
+          id,
+          file_number,
+          status,
+          created_at,
+          updated_at,
+          notes,
+          court_file_number,
+          hearing_date,
+          court_registry,
+          judge_name,
+          property: properties (
+            id,
+            street,
+            city,
+            province,
+            postal_code,
+            property_type,
+            pid,
+            legal_description
+          ),
+          parties: case_parties (
+            party: parties (
+              id,
+              name,
+              type,
+              email,
+              phone,
+              address
+            )
+          ),
+          mortgage: mortgages (
+            id,
+            registration_number,
+            principal,
+            interest_rate,
+            start_date,
+            current_balance,
+            per_diem_interest
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching case:", error);
+        return;
+      }
+
+      if (data) {
+        // Transform the data to match the Case type
+        const transformedCase: Case = {
+          id: data.id,
+          fileNumber: data.file_number,
+          status: data.status,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          property: {
+            id: data.property?.id,
+            address: {
+              street: data.property?.street || "",
+              city: data.property?.city || "",
+              province: data.property?.province || "",
+              postalCode: data.property?.postal_code || "",
+            },
+            pid: data.property?.pid || "",
+            legal_description: data.property?.legal_description || "",
+            propertyType: data.property?.property_type || "Residential",
+          },
+          parties: data.parties.map((cp: any) => ({
+            id: cp.party.id,
+            name: cp.party.name,
+            type: cp.party.type,
+            contactInfo: {
+              email: cp.party.email || '',
+              phone: cp.party.phone || '',
+              address: cp.party.address || ''
+            }
+          })),
+          mortgage: {
+            id: data.mortgage?.id,
+            registrationNumber: data.mortgage?.registration_number,
+            principal: data.mortgage?.principal,
+            interestRate: data.mortgage?.interest_rate,
+            startDate: data.mortgage?.start_date,
+            currentBalance: data.mortgage?.current_balance,
+            perDiemInterest: data.mortgage?.per_diem_interest || 0
+          },
+          deadlines: [],
+          documents: [],
+          court: {
+            fileNumber: data.court_file_number || '',
+            registry: data.court_registry || '',
+            hearingDate: data.hearing_date || null,
+            judgeName: data.judge_name || ''
+          },
+        };
+        setCurrentCase(transformedCase);
+      }
+    } catch (error) {
+      console.error("Error fetching case:", error);
+    }
+  };
 
   const generateDocument = async () => {
-    if (!selectedCase) {
+    if (!currentCase) {
       toast.error("No case selected. Please select a case to generate a document.");
       return;
     }
@@ -38,22 +153,20 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) =
 
       // Case details
       doc.setFontSize(12);
-      doc.text(`Case File Number: ${selectedCase.fileNumber}`, 10, 20);
-      doc.text(`Property Address: ${selectedCase.property.address.street}, ${selectedCase.property.address.city}`, 10, 30);
+      doc.text(`Case File Number: ${currentCase.fileNumber}`, 10, 20);
+      doc.text(`Property Address: ${currentCase.property.address.street}, ${currentCase.property.address.city}`, 10, 30);
 
       // Parties involved
       let yOffset = 40;
-      selectedCase.parties.forEach(party => {
+      currentCase.parties.forEach(party => {
         doc.text(`${party.type}: ${party.name}`, 10, yOffset);
         yOffset += 10;
       });
 
       // Mortgage details
-      doc.text(`Mortgage Registration Number: ${selectedCase.mortgage.registrationNumber}`, 10, yOffset);
+      doc.text(`Mortgage Registration Number: ${currentCase.mortgage.registrationNumber}`, 10, yOffset);
       yOffset += 10;
-      doc.text(`Principal Amount: ${selectedCase.mortgage.principal.toString()}`, 10, yOffset);
-
-      // Add more details as needed
+      doc.text(`Principal Amount: ${currentCase.mortgage.principal.toString()}`, 10, yOffset);
 
       // Example table (using jspdf-autotable)
       (doc as any).autoTable({
@@ -66,7 +179,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) =
       });
 
       // Save the PDF
-      const filename = `Case_${selectedCase.fileNumber}_${documentType}.pdf`;
+      const filename = `Case_${currentCase.fileNumber}_${documentType}.pdf`;
       doc.save(filename);
 
       // Upload the document to Supabase storage
@@ -75,7 +188,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) =
 
       const { data, error } = await supabase.storage
         .from('documents')
-        .upload(`${selectedCase.id}/${filename}`, file, {
+        .upload(`${currentCase.id}/${filename}`, file, {
           cacheControl: '3600',
           upsert: false
         });
@@ -89,11 +202,11 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) =
 
         // Optionally, update the case document list in the database
         const newDocument = {
+          case_id: currentCase.id,
           title: filename,
           type: documentType,
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
           status: "Finalized",
-          caseId: selectedCase.id,
           url: data.path // Store the path in Supabase storage
         };
 
@@ -117,30 +230,30 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase }) =
   };
 
   const templateData = {
-    caseFileNumber: selectedCase?.fileNumber || '',
+    caseFileNumber: currentCase?.fileNumber || '',
     court: {
-      fileNumber: selectedCase?.court?.fileNumber || '',
-      registry: selectedCase?.court?.registry || '',
-      hearingDate: selectedCase?.court?.hearingDate ? format(parseISO(selectedCase.court.hearingDate), 'MMMM d, yyyy') : '',
-      judgeName: selectedCase?.court?.judgeName || ''
+      fileNumber: currentCase?.court?.fileNumber || '',
+      registry: currentCase?.court?.registry || '',
+      hearingDate: currentCase?.court?.hearingDate ? format(parseISO(currentCase.court.hearingDate), 'MMMM d, yyyy') : '',
+      judgeName: currentCase?.court?.judgeName || ''
     },
     property: {
-      address: selectedCase?.property.address.street || '',
-      city: selectedCase?.property.address.city || '',
-      province: selectedCase?.property.address.province || '',
-      postalCode: selectedCase?.property.address.postalCode || '',
-      legalDescription: selectedCase?.property.legal_description || '',
-      propertyType: selectedCase?.property.propertyType || ''
+      address: currentCase?.property.address.street || '',
+      city: currentCase?.property.address.city || '',
+      province: currentCase?.property.address.province || '',
+      postalCode: currentCase?.property.address.postalCode || '',
+      legalDescription: currentCase?.property.legal_description || '',
+      propertyType: currentCase?.property.propertyType || ''
     },
     mortgage: {
-      registrationNumber: selectedCase?.mortgage.registrationNumber || '',
-      principal: selectedCase?.mortgage.principal || 0,
-      interestRate: selectedCase?.mortgage.interestRate || 0,
-      startDate: selectedCase?.mortgage.startDate ? format(parseISO(selectedCase.mortgage.startDate), 'MMMM d, yyyy') : '',
-      currentBalance: selectedCase?.mortgage.currentBalance || 0,
-      perDiemInterest: selectedCase?.mortgage.perDiemInterest || 0
+      registrationNumber: currentCase?.mortgage.registrationNumber || '',
+      principal: currentCase?.mortgage.principal || 0,
+      interestRate: currentCase?.mortgage.interestRate || 0,
+      startDate: currentCase?.mortgage.startDate ? format(parseISO(currentCase.mortgage.startDate), 'MMMM d, yyyy') : '',
+      currentBalance: currentCase?.mortgage.currentBalance || 0,
+      perDiemInterest: currentCase?.mortgage.perDiemInterest || 0
     },
-    parties: selectedCase?.parties.map(party => ({
+    parties: currentCase?.parties.map(party => ({
       name: party.name,
       type: party.type,
       email: party.contactInfo.email,
