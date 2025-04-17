@@ -1,4 +1,3 @@
-
 export type CaseStatus = 
   | 'New' 
   | 'Demand Letter Sent' 
@@ -146,3 +145,6 @@ export interface AuthState {
   session: any | null;
   loading: boolean;
 }
+
+export type DocumentType = "Demand Letter" | "Petition" | "Order Nisi" | "Conduct of Sale" | "Affidavit" | "Final Order" | "Other";
+export type DocumentStatus = "Draft" | "Finalized" | "Filed" | "Served";
