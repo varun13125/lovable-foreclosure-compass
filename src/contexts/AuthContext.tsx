@@ -1,3 +1,4 @@
+
 import { createContext, useState, useEffect, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState, UserProfile } from '@/types';
@@ -137,68 +138,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     setAuthState(prevState => ({ ...prevState, loading: true }));
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
-    if (error) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        setAuthState(prevState => ({ ...prevState, loading: false }));
+        toast.error(error.message);
+        return { error };
+      }
+      
+      // Authentication was successful, but we'll wait for the onAuthStateChange event to update the state
+      return { error: null };
+    } catch (error) {
+      console.error("Unexpected error during sign in:", error);
       setAuthState(prevState => ({ ...prevState, loading: false }));
-      toast.error(error.message);
+      toast.error("An unexpected error occurred during sign in");
       return { error };
     }
-
-    if (data.user) {
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        const adminEmails = ['admin@example.com', 'varunchaudhry.ai@gmail.com'];
-        if (adminEmails.includes(email) && profile.role !== 'system_admin') {
-          await supabase
-            .from('profiles')
-            .update({ role: 'system_admin' })
-            .eq('id', data.user.id);
-          
-          toast.success('Promoted to system admin');
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    }
-
-    return { error: null };
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
     setAuthState(prevState => ({ ...prevState, loading: true }));
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
+      if (error) {
+        setAuthState(prevState => ({ ...prevState, loading: false }));
+        toast.error(error.message);
+      } else {
+        toast.success("Account created successfully! Please verify your email.");
+      }
+      
+      return { error };
+    } catch (error: any) {
+      console.error("Unexpected error during sign up:", error);
       setAuthState(prevState => ({ ...prevState, loading: false }));
-      toast.error(error.message);
-    } else {
-      toast.success("Account created successfully! Please verify your email.");
+      toast.error(error.message || "An unexpected error occurred during sign up");
+      return { error };
     }
-    
-    return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    toast.success("Signed out successfully");
+    try {
+      await supabase.auth.signOut();
+      toast.success("Signed out successfully");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
+    }
   };
 
   const setAuthLoading = (loading: boolean) => {

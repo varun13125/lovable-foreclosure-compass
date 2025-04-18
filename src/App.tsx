@@ -19,6 +19,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Landing from "./pages/Landing";
 import Admin from "./pages/Admin";
+import MasterAdmin from "./pages/MasterAdmin";
 import Auth from "./pages/Auth";
 import AuthGuard from "./components/AuthGuard";
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/master-admin" element={<MasterAdmin />} />
             </Route>
             
             {/* Catch-all */}

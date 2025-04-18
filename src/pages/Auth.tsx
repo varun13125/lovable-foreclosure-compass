@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,11 @@ import { toast } from 'sonner';
 
 export default function Auth() {
   const { authState, signIn, signUp } = useAuth();
-  const [authTab, setAuthTab] = useState<string>('login');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [authTab, setAuthTab] = useState<string>(
+    location.search.includes('tab=register') ? 'register' : 'login'
+  );
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -30,6 +34,11 @@ export default function Auth() {
   // Handle login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!loginEmail || !loginPassword) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+    
     setLoginLoading(true);
     
     try {
@@ -38,7 +47,7 @@ export default function Auth() {
       if (error) {
         toast.error(error.message || 'Failed to sign in');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       toast.error('An unexpected error occurred');
     } finally {
@@ -50,8 +59,18 @@ export default function Auth() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!registerEmail || !registerPassword) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+    
     if (registerPassword !== confirmPassword) {
       toast.error('Passwords do not match');
+      return;
+    }
+    
+    if (registerPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
       return;
     }
     
@@ -66,7 +85,7 @@ export default function Auth() {
         toast.success('Account created! Please check your email for verification.');
         setAuthTab('login');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
       toast.error('An unexpected error occurred');
     } finally {
@@ -76,6 +95,10 @@ export default function Auth() {
 
   // If user is already authenticated, redirect to dashboard
   if (authState.user) {
+    // Redirect system admins to admin page
+    if (authState.user.role === 'system_admin') {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -21,6 +21,11 @@ export default function AuthGuard() {
     return <Navigate to="/auth" state={{ from: location.pathname }} replace />;
   }
 
+  // Special route permissions
+  if (location.pathname === '/master-admin' && authState.user.role !== 'system_admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   // If authenticated, render the protected route
   return <Outlet />;
 }
