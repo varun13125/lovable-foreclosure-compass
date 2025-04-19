@@ -1,163 +1,75 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Header from "@/components/Layout/Header";
-import Sidebar from "@/components/Layout/Sidebar";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle,
-  CardFooter 
-} from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { LawFirm, UserProfile } from "@/types";
-import { 
-  Loader2, 
-  Plus, 
-  Building, 
-  Users, 
-  Shield, 
-  Key, 
-  Check,
-  X,
-  AlertTriangle,
-  RefreshCcw
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Users, Building, Shield, Settings as SettingsIcon } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function MasterAdmin() {
-  const navigate = useNavigate();
+  const { authState } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState("firms");
-  
-  // Firms management
-  const [firms, setFirms] = useState<LawFirm[]>([]);
-  const [newFirmOpen, setNewFirmOpen] = useState(false);
-  const [newFirmName, setNewFirmName] = useState("");
-  const [newFirmEmail, setNewFirmEmail] = useState("");
-  const [newFirmTier, setNewFirmTier] = useState("basic");
-  
-  // Users management
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [newUserOpen, setNewUserOpen] = useState(false);
-  const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserPassword, setNewUserPassword] = useState("");
-  const [newUserFirstName, setNewUserFirstName] = useState("");
-  const [newUserLastName, setNewUserLastName] = useState("");
-  const [newUserFirm, setNewUserFirm] = useState("");
-  const [newUserRole, setNewUserRole] = useState("staff");
-  
-  // Permission management
+  const [lawFirms, setLawFirms] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [features, setFeatures] = useState<any[]>([]);
-  const [editFeaturesOpen, setEditFeaturesOpen] = useState(false);
-  const [currentFeature, setCurrentFeature] = useState<any>(null);
   
-  // Initial load
-  useEffect(() => {
-    checkUserRole();
-  }, []);
+  // New law firm form
+  const [newLawFirm, setNewLawFirm] = useState({
+    name: '',
+    contact_email: '',
+    subscription_tier: 'basic' as 'basic' | 'standard' | 'premium' | 'enterprise',
+    subscription_status: 'active',
+    enabled: true
+  });
+
+  // New user form
+  const [newUser, setNewUser] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    role: 'staff' as 'staff' | 'manager' | 'admin' | 'client' | 'system_admin',
+    law_firm_id: ''
+  });
+
+  // Dialog states
+  const [newLawFirmDialogOpen, setNewLawFirmDialogOpen] = useState(false);
+  const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (userRole === 'system_admin') {
-      if (selectedTab === 'firms') fetchLawFirms();
-      if (selectedTab === 'users') fetchUsers();
-      if (selectedTab === 'permissions') fetchFeatures();
+    if (!authState.user) return;
+    
+    if (authState.user.role !== 'system_admin') {
+      toast.error("You don't have permission to access this page");
+      return;
     }
-  }, [selectedTab, userRole]);
-
-  const checkUserRole = async () => {
-    try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error("You need to be logged in to access this page");
-        navigate('/auth');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        setUserRole(data.role);
-        // If user is not a system_admin, redirect them
-        if (data.role !== 'system_admin') {
-          toast.error("You don't have permission to access this page");
-          navigate('/dashboard');
-        }
-      }
-    } catch (error) {
-      console.error("Error checking user role:", error);
-      toast.error("Error checking permissions");
-      navigate('/dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
+    
+    fetchLawFirms();
+    fetchUsers();
+    fetchFeatures();
+  }, [authState.user]);
 
   const fetchLawFirms = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('law_firms')
         .select('*')
         .order('name');
-
+      
       if (error) throw error;
-
-      if (data) {
-        const formattedFirms: LawFirm[] = data.map(firm => ({
-          id: firm.id,
-          name: firm.name,
-          subscriptionTier: firm.subscription_tier,
-          subscriptionStatus: firm.subscription_status,
-          subscriptionStartDate: firm.subscription_start_date,
-          subscriptionEndDate: firm.subscription_end_date,
-          settings: firm.settings as Record<string, any>,
-          logoUrl: firm.logo_url,
-          contactEmail: firm.contact_email,
-          contactPhone: firm.contact_phone,
-          address: firm.address,
-          enabled: firm.enabled,
-          createdAt: firm.created_at,
-          updatedAt: firm.updated_at
-        }));
-        setFirms(formattedFirms);
-      }
+      
+      setLawFirms(data || []);
     } catch (error) {
-      console.error("Error fetching law firms:", error);
-      toast.error("Failed to load law firms");
+      console.error('Error fetching law firms:', error);
+      toast.error('Failed to load law firms');
     } finally {
       setLoading(false);
     }
@@ -165,724 +77,584 @@ export default function MasterAdmin() {
 
   const fetchUsers = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          role,
-          created_at,
-          updated_at,
-          avatar_url,
-          law_firm_id,
-          law_firms (name)
+          *,
+          law_firms (
+            name
+          )
         `)
-        .order('created_at', { ascending: false });
-
+        .order('email');
+      
       if (error) throw error;
-
-      if (data) {
-        const formattedUsers: UserProfile[] = data.map(user => ({
-          id: user.id,
-          firstName: user.first_name || undefined,
-          lastName: user.last_name || undefined,
-          email: user.email,
-          role: user.role,
-          lawFirmId: user.law_firm_id || undefined,
-          avatarUrl: user.avatar_url || undefined,
-          createdAt: user.created_at,
-          updatedAt: user.updated_at,
-          lawFirmName: user.law_firms?.name
-        }));
-        setUsers(formattedUsers);
-      }
+      
+      setUsers(data || []);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Failed to load users");
-    } finally {
-      setLoading(false);
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
     }
   };
 
   const fetchFeatures = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('features')
         .select('*')
         .order('name');
-
+      
       if (error) throw error;
+      
       setFeatures(data || []);
     } catch (error) {
-      console.error("Error fetching features:", error);
-      toast.error("Failed to load features");
-    } finally {
-      setLoading(false);
+      console.error('Error fetching features:', error);
+      toast.error('Failed to load features');
     }
   };
 
-  const createNewFirm = async () => {
-    if (!newFirmName || !newFirmEmail) {
-      toast.error("Please provide a firm name and contact email");
-      return;
-    }
-
+  const handleCreateLawFirm = async () => {
     try {
+      // Validate form
+      if (!newLawFirm.name || !newLawFirm.contact_email) {
+        toast.error('Please fill all required fields');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('law_firms')
-        .insert([
-          {
-            name: newFirmName,
-            contact_email: newFirmEmail,
-            subscription_tier: newFirmTier,
-            subscription_status: 'active',
-            enabled: true
-          }
-        ])
+        .insert([newLawFirm])
         .select();
-
+      
       if (error) throw error;
-
-      toast.success(`Law firm "${newFirmName}" created successfully`);
-      setNewFirmOpen(false);
-      setNewFirmName("");
-      setNewFirmEmail("");
-      setNewFirmTier("basic");
+      
+      toast.success('Law firm created successfully');
       fetchLawFirms();
+      setNewLawFirmDialogOpen(false);
+      setNewLawFirm({
+        name: '',
+        contact_email: '',
+        subscription_tier: 'basic' as 'basic' | 'standard' | 'premium' | 'enterprise',
+        subscription_status: 'active',
+        enabled: true
+      });
     } catch (error) {
-      console.error("Error creating firm:", error);
-      toast.error("Failed to create firm");
+      console.error('Error creating law firm:', error);
+      toast.error('Failed to create law firm');
     }
   };
 
-  const createNewUser = async () => {
-    if (!newUserEmail || !newUserPassword || !newUserFirm) {
-      toast.error("Please fill all required fields");
-      return;
-    }
-
+  const handleCreateUser = async () => {
     try {
-      // First register the user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: {
-            first_name: newUserFirstName,
-            last_name: newUserLastName,
-          }
+      // Validate form
+      if (!newUser.email || !newUser.first_name || !newUser.last_name || !newUser.role) {
+        toast.error('Please fill all required fields');
+        return;
+      }
+      
+      // Generate a random password
+      const tempPassword = Math.random().toString(36).slice(-8);
+      
+      // First create the auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: newUser.email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          first_name: newUser.first_name,
+          last_name: newUser.last_name
         }
       });
-
+      
       if (authError) throw authError;
       
-      if (authData.user) {
-        // Update the user's profile with firm and role information
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            law_firm_id: newUserFirm,
-            role: newUserRole,
-            first_name: newUserFirstName,
-            last_name: newUserLastName
-          })
-          .eq('id', authData.user.id);
-          
-        if (profileError) throw profileError;
-        
-        toast.success(`User ${newUserEmail} created successfully`);
-        setNewUserOpen(false);
-        setNewUserEmail("");
-        setNewUserPassword("");
-        setNewUserFirstName("");
-        setNewUserLastName("");
-        setNewUserFirm("");
-        setNewUserRole("staff");
-        fetchUsers();
+      if (!authData.user) {
+        toast.error('Failed to create user');
+        return;
       }
-    } catch (error: any) {
-      console.error("Error creating user:", error);
-      toast.error(error.message || "Failed to create user");
-    }
-  };
-
-  const updateFeaturePermissions = async () => {
-    if (!currentFeature) return;
-    
-    try {
-      const { error } = await supabase
-        .from('features')
-        .update({
-          basic_enabled: currentFeature.basic_enabled,
-          standard_enabled: currentFeature.standard_enabled,
-          premium_enabled: currentFeature.premium_enabled,
-          enterprise_enabled: currentFeature.enterprise_enabled
-        })
-        .eq('id', currentFeature.id);
-
-      if (error) throw error;
       
-      toast.success(`Permissions for "${currentFeature.name}" updated`);
-      setEditFeaturesOpen(false);
-      fetchFeatures();
-    } catch (error) {
-      console.error("Error updating feature permissions:", error);
-      toast.error("Failed to update permissions");
+      // Now create the profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          role: newUser.role,
+          law_firm_id: newUser.law_firm_id || null
+        })
+        .eq('id', authData.user.id);
+      
+      if (profileError) throw profileError;
+      
+      toast.success('User created successfully');
+      toast.info(`Temporary password: ${tempPassword}`);
+      fetchUsers();
+      setNewUserDialogOpen(false);
+      setNewUser({
+        email: '',
+        first_name: '',
+        last_name: '',
+        role: 'staff' as 'staff' | 'manager' | 'admin' | 'client' | 'system_admin',
+        law_firm_id: ''
+      });
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast.error(error.message || 'Failed to create user');
     }
   };
 
-  const toggleFirmStatus = async (firmId: string, currentStatus: boolean) => {
+  const handleToggleLawFirmStatus = async (id: string, currentStatus: boolean) => {
     try {
       const { error } = await supabase
         .from('law_firms')
         .update({ enabled: !currentStatus })
-        .eq('id', firmId);
+        .eq('id', id);
       
       if (error) throw error;
       
-      toast.success(`Firm ${currentStatus ? 'disabled' : 'enabled'} successfully`);
       fetchLawFirms();
+      toast.success(`Law firm ${currentStatus ? 'disabled' : 'enabled'} successfully`);
     } catch (error) {
-      console.error("Error toggling firm status:", error);
-      toast.error("Failed to update firm status");
+      console.error('Error updating law firm status:', error);
+      toast.error('Failed to update law firm status');
     }
   };
 
-  const getSubscriptionBadgeColor = (tier: string) => {
-    switch (tier) {
-      case 'basic': return 'bg-gray-500';
-      case 'standard': return 'bg-blue-500';
-      case 'premium': return 'bg-purple-500';
-      case 'enterprise': return 'bg-law-teal';
-      default: return 'bg-gray-500';
+  const handleUpdateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const validRoles = ['staff', 'manager', 'admin', 'client', 'system_admin'];
+      if (!validRoles.includes(newRole)) {
+        toast.error('Invalid role selected');
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      
+      fetchUsers();
+      toast.success('User role updated successfully');
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error('Failed to update user role');
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'system_admin': return 'bg-red-500';
-      case 'admin': return 'bg-law-teal';
-      case 'manager': return 'bg-blue-500';
-      case 'staff': return 'bg-gray-500';
-      case 'client': return 'bg-amber-500';
-      default: return 'bg-gray-500';
+  const handleUpdateFeatureStatus = async (featureId: string, tier: string, status: boolean) => {
+    try {
+      const updateField = `${tier}_enabled`;
+      
+      const { error } = await supabase
+        .from('features')
+        .update({ [updateField]: status })
+        .eq('id', featureId);
+      
+      if (error) throw error;
+      
+      fetchFeatures();
+      toast.success('Feature status updated successfully');
+    } catch (error) {
+      console.error('Error updating feature status:', error);
+      toast.error('Failed to update feature status');
     }
   };
 
-  if (loading) {
+  if (!authState.user || authState.user.role !== 'system_admin') {
     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar />
-        <div className="md:pl-64">
-          <Header />
-          <main className="p-6">
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-law-teal" />
-            </div>
-          </main>
-        </div>
+      <div className="flex h-screen items-center justify-center">
+        <h1 className="text-2xl font-bold">Access Denied</h1>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <div className="md:pl-64">
-        <Header />
-        <main className="p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Master Administration</h1>
-            <p className="text-muted-foreground">Manage law firms, users, and system permissions</p>
-          </div>
-
-          <Tabs value={selectedTab} onValueChange={setSelectedTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="firms">
-                <Building className="mr-2 h-4 w-4" />
-                Law Firms
-              </TabsTrigger>
-              <TabsTrigger value="users">
-                <Users className="mr-2 h-4 w-4" />
-                Users
-              </TabsTrigger>
-              <TabsTrigger value="permissions">
-                <Shield className="mr-2 h-4 w-4" />
-                Permissions
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="firms" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Law Firms</CardTitle>
-                      <CardDescription>Manage law firms and their subscription tiers</CardDescription>
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-8">System Administration</h1>
+      
+      <Tabs defaultValue="law-firms">
+        <TabsList className="mb-6">
+          <TabsTrigger value="law-firms" className="flex items-center">
+            <Building className="mr-2 h-4 w-4" />
+            Law Firms
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center">
+            <Users className="mr-2 h-4 w-4" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="features" className="flex items-center">
+            <Shield className="mr-2 h-4 w-4" />
+            Features & Permissions
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center">
+            <SettingsIcon className="mr-2 h-4 w-4" />
+            System Settings
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="law-firms">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Law Firms</span>
+                <Dialog open={newLawFirmDialogOpen} onOpenChange={setNewLawFirmDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>Add New Law Firm</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New Law Firm</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Firm Name</Label>
+                        <Input 
+                          id="name" 
+                          value={newLawFirm.name} 
+                          onChange={e => setNewLawFirm({...newLawFirm, name: e.target.value})}
+                          placeholder="Enter law firm name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Contact Email</Label>
+                        <Input 
+                          id="email" 
+                          type="email" 
+                          value={newLawFirm.contact_email} 
+                          onChange={e => setNewLawFirm({...newLawFirm, contact_email: e.target.value})}
+                          placeholder="admin@lawfirm.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="subscription">Subscription Tier</Label>
+                        <Select 
+                          value={newLawFirm.subscription_tier} 
+                          onValueChange={value => setNewLawFirm({
+                            ...newLawFirm, 
+                            subscription_tier: value as 'basic' | 'standard' | 'premium' | 'enterprise'
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select tier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="basic">Basic</SelectItem>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="premium">Premium</SelectItem>
+                            <SelectItem value="enterprise">Enterprise</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="enabled" 
+                          checked={newLawFirm.enabled}
+                          onCheckedChange={checked => setNewLawFirm({
+                            ...newLawFirm, 
+                            enabled: checked as boolean
+                          })}
+                        />
+                        <Label htmlFor="enabled">Enabled</Label>
+                      </div>
+                      <Button className="w-full" onClick={handleCreateLawFirm}>
+                        Create Law Firm
+                      </Button>
                     </div>
-                    <Dialog open={newFirmOpen} onOpenChange={setNewFirmOpen}>
-                      <DialogTrigger asChild>
-                        <Button className="bg-law-teal hover:bg-law-teal/90">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add New Firm
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add New Law Firm</DialogTitle>
-                          <DialogDescription>
-                            Create a new law firm account in the system.
-                          </DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="firm-name">Firm Name</Label>
-                            <Input 
-                              id="firm-name"
-                              value={newFirmName}
-                              onChange={(e) => setNewFirmName(e.target.value)}
-                              placeholder="Enter firm name"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="firm-email">Contact Email</Label>
-                            <Input 
-                              id="firm-email"
-                              type="email"
-                              value={newFirmEmail}
-                              onChange={(e) => setNewFirmEmail(e.target.value)}
-                              placeholder="contact@lawfirm.com"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="firm-tier">Subscription Tier</Label>
-                            <Select 
-                              value={newFirmTier}
-                              onValueChange={setNewFirmTier}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select tier" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="basic">Basic</SelectItem>
-                                <SelectItem value="standard">Standard</SelectItem>
-                                <SelectItem value="premium">Premium</SelectItem>
-                                <SelectItem value="enterprise">Enterprise</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                  </DialogContent>
+                </Dialog>
+              </CardTitle>
+              <CardDescription>
+                Manage all law firms in the system
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Subscription</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lawFirms.map(firm => (
+                      <TableRow key={firm.id}>
+                        <TableCell className="font-medium">{firm.name}</TableCell>
+                        <TableCell>{firm.contact_email}</TableCell>
+                        <TableCell>{firm.subscription_tier}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs ${firm.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {firm.enabled ? 'Active' : 'Disabled'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant={firm.enabled ? "destructive" : "outline"}
+                            size="sm"
+                            onClick={() => handleToggleLawFirmStatus(firm.id, firm.enabled)}
+                          >
+                            {firm.enabled ? 'Disable' : 'Enable'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {lawFirms.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                          No law firms found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Users</span>
+                <Dialog open={newUserDialogOpen} onOpenChange={setNewUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>Add New User</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create New User</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input 
+                          id="email" 
+                          type="email"
+                          value={newUser.email} 
+                          onChange={e => setNewUser({...newUser, email: e.target.value})}
+                          placeholder="user@example.com"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName">First Name</Label>
+                          <Input 
+                            id="firstName" 
+                            value={newUser.first_name} 
+                            onChange={e => setNewUser({...newUser, first_name: e.target.value})}
+                            placeholder="John"
+                          />
                         </div>
-                        
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setNewFirmOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button className="bg-law-teal hover:bg-law-teal/90" onClick={createNewFirm}>
-                            Create Firm
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="h-10 px-4 text-left font-medium">Firm Name</th>
-                          <th className="h-10 px-2 text-left font-medium">Subscription</th>
-                          <th className="h-10 px-2 text-left font-medium">Status</th>
-                          <th className="h-10 px-2 text-left font-medium">Contacts</th>
-                          <th className="h-10 px-2 text-right font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {firms.map((firm) => (
-                          <tr key={firm.id} className="border-b hover:bg-muted/50">
-                            <td className="p-4 font-medium">{firm.name}</td>
-                            <td className="px-2">
-                              <Badge className={getSubscriptionBadgeColor(firm.subscriptionTier)}>
-                                {firm.subscriptionTier.toUpperCase()}
-                              </Badge>
-                            </td>
-                            <td className="px-2">
-                              <Badge variant={firm.enabled ? 'default' : 'destructive'}>
-                                {firm.enabled ? 'ACTIVE' : 'DISABLED'}
-                              </Badge>
-                            </td>
-                            <td className="px-2 text-sm">
-                              {firm.contactEmail && <div>{firm.contactEmail}</div>}
-                              {firm.contactPhone && <div>{firm.contactPhone}</div>}
-                            </td>
-                            <td className="px-2 text-right">
-                              <Button variant="outline" size="sm" className="mr-2">Edit</Button>
-                              <Button 
-                                variant={firm.enabled ? "destructive" : "default"} 
-                                size="sm"
-                                onClick={() => toggleFirmStatus(firm.id, firm.enabled)}
-                              >
-                                {firm.enabled ? 'Disable' : 'Enable'}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="users" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Users</CardTitle>
-                      <CardDescription>Manage system users and their roles</CardDescription>
+                        <div className="space-y-2">
+                          <Label htmlFor="lastName">Last Name</Label>
+                          <Input 
+                            id="lastName" 
+                            value={newUser.last_name} 
+                            onChange={e => setNewUser({...newUser, last_name: e.target.value})}
+                            placeholder="Doe"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="role">Role</Label>
+                        <Select 
+                          value={newUser.role} 
+                          onValueChange={value => setNewUser({
+                            ...newUser, 
+                            role: value as 'staff' | 'manager' | 'admin' | 'client' | 'system_admin'
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="staff">Staff</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="client">Client</SelectItem>
+                            <SelectItem value="system_admin">System Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lawFirm">Law Firm</Label>
+                        <Select 
+                          value={newUser.law_firm_id} 
+                          onValueChange={value => setNewUser({...newUser, law_firm_id: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select law firm" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {lawFirms.map(firm => (
+                              <SelectItem key={firm.id} value={firm.id}>
+                                {firm.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button className="w-full" onClick={handleCreateUser}>
+                        Create User
+                      </Button>
                     </div>
-                    <Dialog open={newUserOpen} onOpenChange={setNewUserOpen}>
-                      <DialogTrigger asChild>
-                        <Button className="bg-law-teal hover:bg-law-teal/90">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add New User
+                  </DialogContent>
+                </Dialog>
+              </CardTitle>
+              <CardDescription>
+                Manage all users and their roles
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Law Firm</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map(user => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        {user.first_name} {user.last_name}
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Select 
+                          value={user.role} 
+                          onValueChange={value => handleUpdateUserRole(user.id, value)}
+                        >
+                          <SelectTrigger className="w-24 h-8 text-xs py-0">
+                            <SelectValue placeholder={user.role} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="staff">Staff</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="client">Client</SelectItem>
+                            <SelectItem value="system_admin">System Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>{user.law_firms?.name || 'N/A'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm">
+                          Reset Password
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add New User</DialogTitle>
-                          <DialogDescription>
-                            Create a new user account with specified access level.
-                          </DialogDescription>
-                        </DialogHeader>
-                        
-                        <div className="space-y-4 py-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="first-name">First Name</Label>
-                              <Input 
-                                id="first-name"
-                                value={newUserFirstName}
-                                onChange={(e) => setNewUserFirstName(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="last-name">Last Name</Label>
-                              <Input 
-                                id="last-name"
-                                value={newUserLastName}
-                                onChange={(e) => setNewUserLastName(e.target.value)}
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="user-email">Email</Label>
-                            <Input 
-                              id="user-email"
-                              type="email"
-                              value={newUserEmail}
-                              onChange={(e) => setNewUserEmail(e.target.value)}
-                              placeholder="user@example.com"
-                              required
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="user-password">Password</Label>
-                            <Input 
-                              id="user-password"
-                              type="password"
-                              value={newUserPassword}
-                              onChange={(e) => setNewUserPassword(e.target.value)}
-                              required
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="user-firm">Law Firm</Label>
-                            <Select 
-                              value={newUserFirm}
-                              onValueChange={setNewUserFirm}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select law firm" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {firms.map(firm => (
-                                  <SelectItem key={firm.id} value={firm.id}>
-                                    {firm.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="user-role">Role</Label>
-                            <Select 
-                              value={newUserRole}
-                              onValueChange={setNewUserRole}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select user role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="manager">Manager</SelectItem>
-                                <SelectItem value="staff">Staff</SelectItem>
-                                <SelectItem value="client">Client</SelectItem>
-                                <SelectItem value="system_admin">System Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setNewUserOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button className="bg-law-teal hover:bg-law-teal/90" onClick={createNewUser}>
-                            Create User
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="h-10 px-4 text-left font-medium">User</th>
-                          <th className="h-10 px-2 text-left font-medium">Email</th>
-                          <th className="h-10 px-2 text-left font-medium">Role</th>
-                          <th className="h-10 px-2 text-left font-medium">Law Firm</th>
-                          <th className="h-10 px-2 text-right font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr key={user.id} className="border-b hover:bg-muted/50">
-                            <td className="p-4">
-                              <div className="font-medium">
-                                {user.firstName && user.lastName ? 
-                                  `${user.firstName} ${user.lastName}` : 
-                                  'Unnamed User'}
-                              </div>
-                            </td>
-                            <td className="px-2">{user.email}</td>
-                            <td className="px-2">
-                              <Badge className={getRoleBadgeColor(user.role)}>
-                                {user.role}
-                              </Badge>
-                            </td>
-                            <td className="px-2">{user.lawFirmName || 'N/A'}</td>
-                            <td className="px-2 text-right">
-                              <Button variant="outline" size="sm" className="mr-2">Edit</Button>
-                              <Button variant="ghost" size="sm" className="text-destructive">Delete</Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="permissions" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Feature Permissions</CardTitle>
-                  <CardDescription>
-                    Control which features are available to each subscription tier
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="h-10 px-4 text-left font-medium">Feature</th>
-                          <th className="h-10 px-2 text-center font-medium">Basic</th>
-                          <th className="h-10 px-2 text-center font-medium">Standard</th>
-                          <th className="h-10 px-2 text-center font-medium">Premium</th>
-                          <th className="h-10 px-2 text-center font-medium">Enterprise</th>
-                          <th className="h-10 px-2 text-right font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {features.map((feature) => (
-                          <tr key={feature.id} className="border-b hover:bg-muted/50">
-                            <td className="p-4 font-medium">
-                              {feature.name}
-                              {feature.description && (
-                                <p className="text-xs text-muted-foreground mt-1">{feature.description}</p>
-                              )}
-                            </td>
-                            <td className="px-2 text-center">
-                              {feature.basic_enabled ? (
-                                <Check className="h-5 w-5 text-green-500 mx-auto" />
-                              ) : (
-                                <X className="h-5 w-5 text-red-500 mx-auto" />
-                              )}
-                            </td>
-                            <td className="px-2 text-center">
-                              {feature.standard_enabled ? (
-                                <Check className="h-5 w-5 text-green-500 mx-auto" />
-                              ) : (
-                                <X className="h-5 w-5 text-red-500 mx-auto" />
-                              )}
-                            </td>
-                            <td className="px-2 text-center">
-                              {feature.premium_enabled ? (
-                                <Check className="h-5 w-5 text-green-500 mx-auto" />
-                              ) : (
-                                <X className="h-5 w-5 text-red-500 mx-auto" />
-                              )}
-                            </td>
-                            <td className="px-2 text-center">
-                              {feature.enterprise_enabled ? (
-                                <Check className="h-5 w-5 text-green-500 mx-auto" />
-                              ) : (
-                                <X className="h-5 w-5 text-red-500 mx-auto" />
-                              )}
-                            </td>
-                            <td className="px-2 text-right">
-                              <Dialog 
-                                open={editFeaturesOpen && currentFeature?.id === feature.id} 
-                                onOpenChange={(open) => {
-                                  setEditFeaturesOpen(open);
-                                  if (open) setCurrentFeature({...feature});
-                                }}
-                              >
-                                <DialogTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    <Key className="mr-2 h-4 w-4" />
-                                    Edit Access
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Edit Feature Access</DialogTitle>
-                                    <DialogDescription>
-                                      Determine which subscription tiers have access to {feature.name}.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  
-                                  {currentFeature && (
-                                    <div className="space-y-4 py-4">
-                                      <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                          id="basic" 
-                                          checked={currentFeature.basic_enabled}
-                                          onCheckedChange={(checked) => 
-                                            setCurrentFeature({
-                                              ...currentFeature, 
-                                              basic_enabled: checked === true
-                                            })
-                                          }
-                                        />
-                                        <Label htmlFor="basic">
-                                          Basic Tier Access
-                                        </Label>
-                                      </div>
-                                      
-                                      <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                          id="standard" 
-                                          checked={currentFeature.standard_enabled}
-                                          onCheckedChange={(checked) => 
-                                            setCurrentFeature({
-                                              ...currentFeature, 
-                                              standard_enabled: checked === true
-                                            })
-                                          }
-                                        />
-                                        <Label htmlFor="standard">
-                                          Standard Tier Access
-                                        </Label>
-                                      </div>
-                                      
-                                      <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                          id="premium" 
-                                          checked={currentFeature.premium_enabled}
-                                          onCheckedChange={(checked) => 
-                                            setCurrentFeature({
-                                              ...currentFeature, 
-                                              premium_enabled: checked === true
-                                            })
-                                          }
-                                        />
-                                        <Label htmlFor="premium">
-                                          Premium Tier Access
-                                        </Label>
-                                      </div>
-                                      
-                                      <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                          id="enterprise" 
-                                          checked={currentFeature.enterprise_enabled}
-                                          onCheckedChange={(checked) => 
-                                            setCurrentFeature({
-                                              ...currentFeature, 
-                                              enterprise_enabled: checked === true
-                                            })
-                                          }
-                                        />
-                                        <Label htmlFor="enterprise">
-                                          Enterprise Tier Access
-                                        </Label>
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  <DialogFooter>
-                                    <Button variant="outline" onClick={() => setEditFeaturesOpen(false)}>
-                                      Cancel
-                                    </Button>
-                                    <Button 
-                                      className="bg-law-teal hover:bg-law-teal/90" 
-                                      onClick={updateFeaturePermissions}
-                                    >
-                                      Save Changes
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" onClick={fetchFeatures}>
-                    <RefreshCcw className="mr-2 h-4 w-4" />
-                    Refresh
-                  </Button>
-                  <Button className="bg-law-teal hover:bg-law-teal/90">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create New Feature
-                  </Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </main>
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {users.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                        No users found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="features">
+          <Card>
+            <CardHeader>
+              <CardTitle>Features & Permissions</CardTitle>
+              <CardDescription>
+                Configure which features are available in each subscription tier
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Feature</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Basic</TableHead>
+                    <TableHead>Standard</TableHead>
+                    <TableHead>Premium</TableHead>
+                    <TableHead>Enterprise</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {features.map(feature => (
+                    <TableRow key={feature.id}>
+                      <TableCell className="font-medium">{feature.name}</TableCell>
+                      <TableCell>{feature.description}</TableCell>
+                      <TableCell>
+                        <Checkbox 
+                          checked={feature.basic_enabled}
+                          onCheckedChange={checked => 
+                            handleUpdateFeatureStatus(feature.id, 'basic', checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox 
+                          checked={feature.standard_enabled}
+                          onCheckedChange={checked => 
+                            handleUpdateFeatureStatus(feature.id, 'standard', checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox 
+                          checked={feature.premium_enabled}
+                          onCheckedChange={checked => 
+                            handleUpdateFeatureStatus(feature.id, 'premium', checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox 
+                          checked={feature.enterprise_enabled}
+                          onCheckedChange={checked => 
+                            handleUpdateFeatureStatus(feature.id, 'enterprise', checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {features.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                        No features defined
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>
+                Configure global system settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">System settings coming soon...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

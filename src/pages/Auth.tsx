@@ -45,7 +45,10 @@ export default function Auth() {
       const { error } = await signIn(loginEmail, loginPassword);
       
       if (error) {
+        console.error("Login error:", error);
         toast.error(error.message || 'Failed to sign in');
+      } else {
+        toast.success('Signed in successfully!');
       }
     } catch (error: any) {
       console.error('Login error:', error);
@@ -94,9 +97,11 @@ export default function Auth() {
   };
 
   // If user is already authenticated, redirect to dashboard
-  if (authState.user) {
+  if (authState.user && !authState.loading) {
     // Redirect system admins to admin page
     if (authState.user.role === 'system_admin') {
+      return <Navigate to="/master-admin" replace />;
+    } else if (authState.user.role === 'admin') {
       return <Navigate to="/admin" replace />;
     }
     return <Navigate to="/dashboard" replace />;
@@ -158,9 +163,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full bg-law-navy hover:bg-law-navy/90"
-                    disabled={loginLoading}
+                    disabled={loginLoading || authState.loading}
                   >
-                    {loginLoading ? (
+                    {loginLoading || authState.loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing In...

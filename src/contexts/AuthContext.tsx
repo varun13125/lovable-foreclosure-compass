@@ -27,48 +27,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthState(prevState => ({ ...prevState, session }));
         
         if (session?.user) {
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select(`
-                id, 
-                email, 
-                first_name, 
-                last_name, 
-                role, 
-                avatar_url, 
-                law_firm_id,
-                created_at,
-                updated_at,
-                law_firms(name)
-              `)
-              .eq('id', session.user.id)
-              .single();
+          // Use setTimeout to prevent deadlocks with Supabase auth
+          setTimeout(async () => {
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select(`
+                  id, 
+                  email, 
+                  first_name, 
+                  last_name, 
+                  role, 
+                  avatar_url, 
+                  law_firm_id,
+                  created_at,
+                  updated_at,
+                  law_firms(name)
+                `)
+                .eq('id', session.user.id)
+                .single();
 
-            if (error) throw error;
+              if (error) {
+                console.error("Error fetching user profile:", error);
+                toast.error("Error loading user profile");
+                setAuthState(prevState => ({ 
+                  ...prevState, 
+                  loading: false 
+                }));
+                return;
+              }
 
-            const userProfile: UserProfile = {
-              id: profile.id,
-              email: profile.email,
-              firstName: profile.first_name || undefined,
-              lastName: profile.last_name || undefined,
-              role: profile.role,
-              lawFirmId: profile.law_firm_id || undefined,
-              avatarUrl: profile.avatar_url || undefined,
-              createdAt: profile.created_at,
-              updatedAt: profile.updated_at,
-              lawFirmName: profile.law_firms?.name
-            };
+              if (profile) {
+                const userProfile: UserProfile = {
+                  id: profile.id,
+                  email: profile.email,
+                  firstName: profile.first_name || undefined,
+                  lastName: profile.last_name || undefined,
+                  role: profile.role,
+                  lawFirmId: profile.law_firm_id || undefined,
+                  avatarUrl: profile.avatar_url || undefined,
+                  createdAt: profile.created_at,
+                  updatedAt: profile.updated_at,
+                  lawFirmName: profile.law_firms?.name
+                };
 
-            setAuthState(prevState => ({ 
-              ...prevState, 
-              user: userProfile,
-              loading: false 
-            }));
-          } catch (error) {
-            console.error("Error fetching user profile:", error);
-            setAuthState(prevState => ({ ...prevState, loading: false }));
-          }
+                setAuthState(prevState => ({ 
+                  ...prevState, 
+                  user: userProfile,
+                  loading: false 
+                }));
+              } else {
+                // If no profile found, create one
+                const { data: newProfile, error: insertError } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email,
+                    role: 'staff',
+                    first_name: session.user.user_metadata.first_name,
+                    last_name: session.user.user_metadata.last_name
+                  })
+                  .select()
+                  .single();
+                
+                if (insertError) {
+                  console.error("Error creating user profile:", insertError);
+                  toast.error("Error creating user profile");
+                  setAuthState(prevState => ({ ...prevState, loading: false }));
+                  return;
+                }
+                
+                const userProfile: UserProfile = {
+                  id: newProfile.id,
+                  email: newProfile.email,
+                  firstName: newProfile.first_name || undefined,
+                  lastName: newProfile.last_name || undefined,
+                  role: newProfile.role,
+                  lawFirmId: newProfile.law_firm_id || undefined,
+                  avatarUrl: newProfile.avatar_url || undefined,
+                  createdAt: newProfile.created_at,
+                  updatedAt: newProfile.updated_at
+                };
+
+                setAuthState(prevState => ({ 
+                  ...prevState, 
+                  user: userProfile,
+                  loading: false 
+                }));
+              }
+            } catch (error) {
+              console.error("Error in auth state change handler:", error);
+              setAuthState(prevState => ({ ...prevState, loading: false }));
+            }
+          }, 0);
         } else {
           setAuthState(prevState => ({ 
             ...prevState, 
@@ -85,50 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setTimeout(async () => {
-        try {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select(`
-              id, 
-              email, 
-              first_name, 
-              last_name, 
-              role, 
-              avatar_url, 
-              law_firm_id,
-              created_at,
-              updated_at,
-              law_firms(name)
-            `)
-            .eq('id', session.user.id)
-            .single();
+      setAuthState(prevState => ({ 
+        ...prevState, 
+        session,
+        loading: false 
+      }));
 
-          if (error) throw error;
-
-          const userProfile: UserProfile = {
-            id: profile.id,
-            email: profile.email,
-            firstName: profile.first_name || undefined,
-            lastName: profile.last_name || undefined,
-            role: profile.role,
-            lawFirmId: profile.law_firm_id || undefined,
-            avatarUrl: profile.avatar_url || undefined,
-            createdAt: profile.created_at,
-            updatedAt: profile.updated_at,
-            lawFirmName: profile.law_firms?.name
-          };
-
-          setAuthState({ 
-            user: userProfile,
-            session,
-            loading: false 
-          });
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setAuthState(prevState => ({ ...prevState, loading: false }));
-        }
-      }, 0);
+      // The actual fetching of the profile will be handled by onAuthStateChange
     });
 
     return () => {
