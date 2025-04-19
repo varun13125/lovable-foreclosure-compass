@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,6 @@ export default function MasterAdmin() {
   const [users, setUsers] = useState<any[]>([]);
   const [features, setFeatures] = useState<any[]>([]);
   
-  // New law firm form
   const [newLawFirm, setNewLawFirm] = useState({
     name: '',
     contact_email: '',
@@ -30,7 +28,6 @@ export default function MasterAdmin() {
     enabled: true
   });
 
-  // New user form
   const [newUser, setNewUser] = useState({
     email: '',
     first_name: '',
@@ -39,7 +36,6 @@ export default function MasterAdmin() {
     law_firm_id: ''
   });
 
-  // Dialog states
   const [newLawFirmDialogOpen, setNewLawFirmDialogOpen] = useState(false);
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
 
@@ -114,7 +110,6 @@ export default function MasterAdmin() {
 
   const handleCreateLawFirm = async () => {
     try {
-      // Validate form
       if (!newLawFirm.name || !newLawFirm.contact_email) {
         toast.error('Please fill all required fields');
         return;
@@ -145,16 +140,13 @@ export default function MasterAdmin() {
 
   const handleCreateUser = async () => {
     try {
-      // Validate form
       if (!newUser.email || !newUser.first_name || !newUser.last_name || !newUser.role) {
         toast.error('Please fill all required fields');
         return;
       }
       
-      // Generate a random password
       const tempPassword = Math.random().toString(36).slice(-8);
       
-      // First create the auth user
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: tempPassword,
@@ -172,7 +164,6 @@ export default function MasterAdmin() {
         return;
       }
       
-      // Now create the profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -227,7 +218,7 @@ export default function MasterAdmin() {
       
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole })
+        .update({ role: newRole as 'staff' | 'manager' | 'admin' | 'client' | 'system_admin' })
         .eq('id', userId);
       
       if (error) throw error;

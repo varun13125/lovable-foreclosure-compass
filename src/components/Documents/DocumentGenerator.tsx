@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Case, DocumentType } from '@/types';
 import { toast } from 'sonner';
@@ -7,16 +7,51 @@ import { useCase } from '@/hooks/useCase';
 import { generateCaseDocument } from '@/utils/pdfGenerator';
 import { uploadDocument } from '@/services/documentService';
 import DocumentTypeSelect from './DocumentTypeSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DocumentGeneratorProps {
   selectedCase: Case | null;
   caseId?: string;
 }
 
+interface Template {
+  id: number;
+  name: string;
+  description: string;
+  content: string;
+}
+
 const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, caseId }) => {
   const [documentType, setDocumentType] = useState<DocumentType>('Demand Letter');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const { currentCase } = useCase(selectedCase, caseId);
+
+  // Load templates from local storage
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('document_templates');
+    if (savedTemplates) {
+      const parsedTemplates = JSON.parse(savedTemplates);
+      setTemplates(parsedTemplates);
+      
+      // Auto-select template that matches document type
+      const matchingTemplate = parsedTemplates.find((t: Template) => t.name === documentType);
+      if (matchingTemplate) {
+        setSelectedTemplate(matchingTemplate.id);
+      }
+    }
+  }, [documentType]);
+
+  // Update selected template when document type changes
+  useEffect(() => {
+    const matchingTemplate = templates.find(t => t.name === documentType);
+    if (matchingTemplate) {
+      setSelectedTemplate(matchingTemplate.id);
+    } else {
+      setSelectedTemplate(null);
+    }
+  }, [documentType, templates]);
 
   const generateDocument = async () => {
     if (!currentCase) {
@@ -27,7 +62,12 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
     setIsGenerating(true);
 
     try {
-      const doc = generateCaseDocument(currentCase, documentType);
+      // Get the selected template content if available
+      const template = selectedTemplate 
+        ? templates.find(t => t.id === selectedTemplate)?.content 
+        : undefined;
+      
+      const doc = generateCaseDocument(currentCase, documentType, template);
       const filename = `Case_${currentCase.fileNumber}_${documentType}.pdf`;
       
       // Create PDF blob and file
@@ -39,6 +79,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
       
       // Upload to storage
       await uploadDocument(currentCase.id, file, filename, documentType);
+      
+      toast.success("Document generated successfully!");
     } catch (error) {
       console.error("Error generating document:", error);
       toast.error("Failed to generate document.");
@@ -50,10 +92,40 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4">Generate Document</h2>
-      <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
-      <Button onClick={generateDocument} disabled={isGenerating}>
-        {isGenerating ? "Generating..." : "Generate Document"}
-      </Button>
+      
+      <div className="space-y-4">
+        <div>
+          <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium mb-2">Template</label>
+          <Select 
+            value={selectedTemplate?.toString() || ""} 
+            onValueChange={(value) => setSelectedTemplate(value ? parseInt(value) : null)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Default Template</SelectItem>
+              {templates.map((template) => (
+                <SelectItem key={template.id} value={template.id.toString()}>
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <Button 
+          onClick={generateDocument} 
+          disabled={isGenerating || !currentCase}
+          className="w-full"
+        >
+          {isGenerating ? "Generating..." : "Generate Document"}
+        </Button>
+      </div>
     </div>
   );
 };

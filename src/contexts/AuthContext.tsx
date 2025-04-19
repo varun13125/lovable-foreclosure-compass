@@ -22,8 +22,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event);
         setAuthState(prevState => ({ ...prevState, session }));
         
         if (session?.user) {
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
 
               if (profile) {
+                console.log('Profile found:', profile);
                 const userProfile: UserProfile = {
                   id: profile.id,
                   email: profile.email,
@@ -77,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   loading: false 
                 }));
               } else {
+                console.log('No profile found, creating one...');
                 // If no profile found, create one
                 const { data: newProfile, error: insertError } = await supabase
                   .from('profiles')
@@ -84,8 +88,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: session.user.id,
                     email: session.user.email,
                     role: 'staff',
-                    first_name: session.user.user_metadata.first_name,
-                    last_name: session.user.user_metadata.last_name
+                    first_name: session.user.user_metadata?.first_name,
+                    last_name: session.user.user_metadata?.last_name
                   })
                   .select()
                   .single();
@@ -97,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   return;
                 }
                 
+                console.log('New profile created:', newProfile);
                 const userProfile: UserProfile = {
                   id: newProfile.id,
                   email: newProfile.email,
@@ -130,7 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session ? 'Found session' : 'No session');
+      
       if (!session) {
         setAuthState(prevState => ({ ...prevState, loading: false }));
         return;
@@ -139,9 +147,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthState(prevState => ({ 
         ...prevState, 
         session,
-        loading: false 
       }));
-
+      
       // The actual fetching of the profile will be handled by onAuthStateChange
     });
 
@@ -154,13 +161,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuthState(prevState => ({ ...prevState, loading: true }));
     
     try {
+      console.log(`Signing in with email: ${email}`);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
         setAuthState(prevState => ({ ...prevState, loading: false }));
+        console.error('Sign in error:', error);
         toast.error(error.message);
         return { error };
       }
+      
+      console.log('Sign in successful:', data);
+      toast.success('Signed in successfully!');
       
       // Authentication was successful, but we'll wait for the onAuthStateChange event to update the state
       return { error: null };

@@ -1,7 +1,7 @@
 
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { Case } from '@/types';
+import { Case, DocumentType } from '@/types';
 import { format } from 'date-fns';
 
 // Extend jsPDF with autotable plugin
@@ -11,10 +11,85 @@ declare module 'jspdf' {
   }
 }
 
-export const generateCaseDocument = (currentCase: Case, documentType: string) => {
+// Function to replace template variables with actual data
+const replaceTemplateVariables = (template: string, currentCase: Case): string => {
+  const replacements: Record<string, string> = {
+    '{date}': format(new Date(), 'MMMM d, yyyy'),
+    '{property.address}': `${currentCase.property.address.street}, ${currentCase.property.address.city}, ${currentCase.property.address.province} ${currentCase.property.address.postalCode}`,
+    '{mortgage.number}': currentCase.mortgage.registrationNumber,
+    '{mortgage.balance}': currentCase.mortgage.currentBalance.toLocaleString(),
+    '{mortgage.principal}': currentCase.mortgage.principal.toLocaleString(),
+    '{mortgage.per_diem}': currentCase.mortgage.perDiemInterest.toFixed(2),
+    '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate}%`,
+    '{court.file_number}': currentCase.court?.fileNumber || 'N/A',
+    '{court.registry}': currentCase.court?.registry || 'N/A',
+    '{court.hearing_date}': currentCase.court?.hearingDate 
+      ? format(new Date(currentCase.court.hearingDate), 'MMMM d, yyyy') 
+      : 'N/A',
+    '{court.judge_name}': currentCase.court?.judgeName || 'N/A'
+  };
+
+  // Add parties dynamically
+  currentCase.parties.forEach(party => {
+    const type = party.type.toLowerCase();
+    replacements[`{${type}.name}`] = party.name;
+    replacements[`{${type}.email}`] = party.contactInfo.email;
+    replacements[`{${type}.phone}`] = party.contactInfo.phone;
+    if (party.contactInfo.address) {
+      replacements[`{${type}.address}`] = party.contactInfo.address;
+    }
+  });
+
+  // Replace all variables in the template
+  let result = template;
+  for (const [key, value] of Object.entries(replacements)) {
+    result = result.split(key).join(value);
+  }
+  
+  return result;
+};
+
+export const generateCaseDocument = (currentCase: Case, documentType: string, template?: string) => {
   const doc = new jsPDF();
   
-  // Document header
+  if (template) {
+    // Process template-based document
+    const processedContent = replaceTemplateVariables(template, currentCase);
+    const lines = processedContent.split('\n');
+    
+    let yPos = 20;
+    doc.setFontSize(12);
+    
+    lines.forEach(line => {
+      if (line.trim().length === 0) {
+        yPos += 10; // Empty line spacing
+        return;
+      }
+      
+      // Check if line should be a header
+      if (line.toUpperCase() === line && line.length > 10) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(line, 20, yPos);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+      } else {
+        doc.text(line, 20, yPos);
+      }
+      
+      yPos += 10;
+      
+      // Add new page if needed
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+    });
+    
+    return doc;
+  }
+  
+  // Fall back to the default document generation if no template provided
   doc.setFontSize(18);
   doc.text(`Document Type: ${documentType}`, 10, 10);
   
