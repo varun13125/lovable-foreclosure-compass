@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Case, DocumentType } from '@/types';
+import React from 'react';
+import { Case } from '@/types';
 import { useCase } from '@/hooks/useCase';
 import DocumentEditor from './DocumentEditor';
 
@@ -10,8 +10,6 @@ interface DocumentGeneratorProps {
 }
 
 const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, caseId }) => {
-  const { currentCase } = useCase(selectedCase, caseId);
-  
   return (
     <div>
       <DocumentEditor selectedCase={selectedCase} caseId={caseId} />
