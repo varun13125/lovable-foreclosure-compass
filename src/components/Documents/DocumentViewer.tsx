@@ -26,12 +26,6 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [saving, setSaving] = useState(false);
   const [formattedContent, setFormattedContent] = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [selection, setSelection] = useState<{
-    start: number;
-    end: number;
-    node: Node | null;
-  } | null>(null);
 
   useEffect(() => {
     if (content) {
@@ -49,93 +43,19 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
     }
   }, [content]);
 
-  // Save selection state when user is editing
-  const saveSelection = () => {
-    if (window.getSelection && editorRef.current) {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && editorRef.current.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        setSelection({
-          start: range.startOffset,
-          end: range.endOffset,
-          node: range.startContainer
-        });
-      }
-    }
-  };
-
-  // Restore selection after DOM updates
-  const restoreSelection = () => {
-    if (selection && editorRef.current) {
-      const sel = window.getSelection();
-      if (sel && selection.node && editorRef.current.contains(selection.node)) {
-        // Fix: Use window.document instead of just document
-        const range = window.document.createRange();
-        try {
-          range.setStart(selection.node, selection.start);
-          range.setEnd(selection.node, selection.end);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } catch (error) {
-          console.error("Failed to restore selection:", error);
-        }
-      }
-    }
-  };
-
-  const handleContentChange = () => {
+  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
     if (editorRef.current) {
-      saveSelection();
       setDocumentContent(editorRef.current.innerHTML);
     }
   };
 
+  // Setup editor when editing mode changes
   useEffect(() => {
     if (isEditing && editorRef.current) {
-      const editor = editorRef.current;
-      
       // Focus the editor when editing starts
-      editor.focus();
-      
-      // Setup event handlers for cursor position tracking
-      const handleKeyEvents = () => {
-        saveSelection();
-      };
-      
-      const handleBlur = () => {
-        saveSelection();
-      };
-      
-      const handleFocus = () => {
-        setTimeout(restoreSelection, 0);
-      };
-      
-      // Add all event listeners
-      editor.addEventListener('keyup', handleKeyEvents);
-      editor.addEventListener('keydown', handleKeyEvents);
-      editor.addEventListener('mouseup', handleKeyEvents);
-      editor.addEventListener('blur', handleBlur);
-      editor.addEventListener('focus', handleFocus);
-      editor.addEventListener('input', handleContentChange);
-      
-      // Clean up event listeners
-      return () => {
-        editor.removeEventListener('keyup', handleKeyEvents);
-        editor.removeEventListener('keydown', handleKeyEvents);
-        editor.removeEventListener('mouseup', handleKeyEvents);
-        editor.removeEventListener('blur', handleBlur);
-        editor.removeEventListener('focus', handleFocus);
-        editor.removeEventListener('input', handleContentChange);
-      };
+      editorRef.current.focus();
     }
   }, [isEditing]);
-
-  // Restore cursor position after render
-  useEffect(() => {
-    if (isEditing) {
-      restoreSelection();
-    }
-  }, [documentContent, isEditing]);
 
   const handlePrint = () => {
     try {
@@ -339,10 +259,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
       
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <ScrollArea 
-            className={`h-[70vh] w-full ${isEditing ? 'bg-white' : 'bg-gray-50 dark:bg-gray-900/20'}`}
-            viewportRef={viewportRef}
-          >
+          <ScrollArea className={`h-[70vh] w-full ${isEditing ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-900/20'}`}>
             <div className="p-6">
               {isEditing ? (
                 <div
@@ -351,6 +268,12 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   className="outline-none min-h-full prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{ __html: documentContent }}
                   suppressContentEditableWarning
+                  onInput={handleContentChange}
+                  style={{
+                    fontFamily: "Arial, sans-serif",
+                    lineHeight: 1.5,
+                    minHeight: "60vh"
+                  }}
                 />
               ) : (
                 <div 
