@@ -10,9 +10,11 @@ interface DocumentGeneratorProps {
 }
 
 const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, caseId }) => {
+  const { currentCase } = useCase(selectedCase, caseId);
+  
   return (
     <div>
-      <DocumentEditor selectedCase={selectedCase} caseId={caseId} />
+      <DocumentEditor selectedCase={currentCase} caseId={caseId} />
     </div>
   );
 };

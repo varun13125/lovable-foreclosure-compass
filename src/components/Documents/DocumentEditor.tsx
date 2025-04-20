@@ -124,29 +124,31 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   }, [content, currentCase, activeTab]);
 
   // Replace template variables with case data
-  const replaceTemplateVariables = (template: string, currentCase: Case): string => {
+  const replaceTemplateVariables = (template: string, caseData: Case): string => {
+    if (!caseData) return template;
+    
     const replacements: Record<string, string> = {
       '{date}': format(new Date(), 'MMMM d, yyyy'),
-      '{property.address}': `${currentCase.property.address.street}, ${currentCase.property.address.city}, ${currentCase.property.address.province} ${currentCase.property.address.postalCode}`,
-      '{mortgage.number}': currentCase.mortgage.registrationNumber,
-      '{mortgage.balance}': currentCase.mortgage.currentBalance.toLocaleString(),
-      '{mortgage.principal}': currentCase.mortgage.principal.toLocaleString(),
-      '{mortgage.per_diem}': currentCase.mortgage.perDiemInterest.toFixed(2),
-      '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate}%`,
-      '{mortgage.arrears}': currentCase.mortgage.arrears?.toLocaleString() || 'N/A',
-      '{court.file_number}': currentCase.court?.fileNumber || 'N/A',
-      '{court.registry}': currentCase.court?.registry || 'N/A',
-      '{court.hearing_date}': currentCase.court?.hearingDate 
-        ? format(new Date(currentCase.court.hearingDate), 'MMMM d, yyyy') 
+      '{property.address}': `${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province} ${caseData.property.address.postalCode}`,
+      '{mortgage.number}': caseData.mortgage.registrationNumber,
+      '{mortgage.balance}': caseData.mortgage.currentBalance.toLocaleString(),
+      '{mortgage.principal}': caseData.mortgage.principal.toLocaleString(),
+      '{mortgage.per_diem}': caseData.mortgage.perDiemInterest.toFixed(2),
+      '{mortgage.interest_rate}': `${caseData.mortgage.interestRate}%`,
+      '{mortgage.arrears}': caseData.mortgage.arrears?.toLocaleString() || 'N/A',
+      '{court.file_number}': caseData.court?.fileNumber || 'N/A',
+      '{court.registry}': caseData.court?.registry || 'N/A',
+      '{court.hearing_date}': caseData.court?.hearingDate 
+        ? format(new Date(caseData.court.hearingDate), 'MMMM d, yyyy') 
         : 'N/A',
-      '{court.judge_name}': currentCase.court?.judgeName || 'N/A',
-      '{case.file_number}': currentCase.fileNumber,
-      '{case.status}': currentCase.status,
-      '{case.created_at}': format(new Date(currentCase.createdAt), 'MMMM d, yyyy')
+      '{court.judge_name}': caseData.court?.judgeName || 'N/A',
+      '{case.file_number}': caseData.fileNumber,
+      '{case.status}': caseData.status,
+      '{case.created_at}': format(new Date(caseData.createdAt), 'MMMM d, yyyy')
     };
 
     // Add parties dynamically
-    currentCase.parties.forEach(party => {
+    caseData.parties.forEach(party => {
       const type = party.type.toLowerCase();
       replacements[`{${type}.name}`] = party.name;
       replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
@@ -158,7 +160,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
 
     // Find lender/borrower if not found in specific types
     if (!replacements['{lender.name}']) {
-      const lender = currentCase.parties.find(p => 
+      const lender = caseData.parties.find(p => 
         p.type.toLowerCase().includes('lender') || 
         p.type.toLowerCase().includes('mortgagee')
       );
@@ -170,7 +172,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
     
     if (!replacements['{borrower.name}']) {
-      const borrower = currentCase.parties.find(p => 
+      const borrower = caseData.parties.find(p => 
         p.type.toLowerCase().includes('borrower') || 
         p.type.toLowerCase().includes('mortgagor')
       );
@@ -382,14 +384,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
             
             <Select 
-              value={selectedTemplate?.toString() || "default"} 
-              onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
+              value={selectedTemplate !== null ? selectedTemplate.toString() : "no_template"} 
+              onValueChange={(value) => setSelectedTemplate(value !== "no_template" ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select a template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">No Template</SelectItem>
+                <SelectItem value="no_template">No Template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}
