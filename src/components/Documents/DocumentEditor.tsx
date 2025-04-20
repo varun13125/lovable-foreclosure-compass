@@ -70,6 +70,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
   const [editorHasFocus, setEditorHasFocus] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState<Range | null>(null);
   
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
@@ -138,10 +139,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         
         document.execCommand('fontName', false, currentFont);
         applyFontSize(currentFontSize);
+        
+        if (cursorPosition) {
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(cursorPosition);
+          }
+        }
       };
       
       const handleEditorBlur = () => {
         setEditorHasFocus(false);
+        
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          setCursorPosition(selection.getRangeAt(0).cloneRange());
+        }
       };
       
       const handlePaste = (e: ClipboardEvent) => {
@@ -152,10 +166,27 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       
       const handleKeyUp = (e: KeyboardEvent) => {
         setContent(editorElement.innerHTML);
+        
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          setCursorPosition(selection.getRangeAt(0).cloneRange());
+        }
+        
         e.stopPropagation();
       };
       
       const handleKeyDown = (e: KeyboardEvent) => {
+        e.stopPropagation();
+      };
+      
+      const handleInput = (e: Event) => {
+        setContent(editorElement.innerHTML);
+        
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          setCursorPosition(selection.getRangeAt(0).cloneRange());
+        }
+        
         e.stopPropagation();
       };
       
@@ -164,6 +195,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       editorElement.addEventListener('paste', handlePaste);
       editorElement.addEventListener('keyup', handleKeyUp);
       editorElement.addEventListener('keydown', handleKeyDown);
+      editorElement.addEventListener('input', handleInput);
       
       return () => {
         editorElement.removeEventListener('focus', handleEditorFocus);
@@ -171,9 +203,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         editorElement.removeEventListener('paste', handlePaste);
         editorElement.removeEventListener('keyup', handleKeyUp);
         editorElement.removeEventListener('keydown', handleKeyDown);
+        editorElement.removeEventListener('input', handleInput);
       };
     }
-  }, [contentRef.current, currentFont, currentFontSize]);
+  }, [contentRef.current, currentFont, currentFontSize, cursorPosition]);
   
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
@@ -253,7 +286,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     
     contentRef.current.focus();
     document.execCommand(command, false, value);
+    
     setContent(contentRef.current.innerHTML);
+    
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      setCursorPosition(selection.getRangeAt(0).cloneRange());
+    }
   };
   
   const applyFontSize = (size: string) => {
@@ -280,6 +319,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);
+      
+      const newSelection = window.getSelection();
+      if (newSelection && newSelection.rangeCount > 0) {
+        setCursorPosition(newSelection.getRangeAt(0).cloneRange());
+      }
     }
   };
 
@@ -467,6 +511,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         document.execCommand('insertText', false, ' ');
         
         setContent(contentRef.current.innerHTML);
+        
+        const newSelection = window.getSelection();
+        if (newSelection && newSelection.rangeCount > 0) {
+          setCursorPosition(newSelection.getRangeAt(0).cloneRange());
+        }
       }
     }
   };
@@ -478,6 +527,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       contentRef.current.focus();
       document.execCommand('fontName', false, font);
       setContent(contentRef.current.innerHTML);
+      
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        setCursorPosition(selection.getRangeAt(0).cloneRange());
+      }
     }
   };
 
@@ -796,19 +850,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             </Popover>
           </div>
           
-          <ScrollArea className="h-[500px] relative">
+          <div ref={editorContainerRef} className="h-[500px] relative overflow-hidden">
             <div 
               ref={contentRef}
-              className="min-h-[500px] p-4 border rounded-md focus:outline-none whitespace-pre-wrap" 
+              className="h-full p-4 border rounded-md focus:outline-none whitespace-pre-wrap overflow-auto" 
               contentEditable={true}
-              onInput={(e) => {
-                setContent((e.target as HTMLDivElement).innerHTML);
-                e.stopPropagation();
-              }}
+              suppressContentEditableWarning={true}
               dangerouslySetInnerHTML={{ __html: content }}
               style={{ fontFamily: currentFont }}
             />
-          </ScrollArea>
+          </div>
         </TabsContent>
         
         <TabsContent value="preview" className="border rounded-md p-4">
