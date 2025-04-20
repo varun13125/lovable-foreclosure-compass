@@ -1,14 +1,15 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Download, Printer, Check } from 'lucide-react';
+import { Download, Printer, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { generateCaseDocument } from '@/utils/pdfGenerator';
+import RichTextEditor from '@/components/RichTextEditor';
 
 interface DocumentViewerProps {
   document: Document;
@@ -24,28 +25,12 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [documentContent, setDocumentContent] = useState('');
   const [saving, setSaving] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (content) {
-      // Apply basic formatting to enhance readability
-      let formatted = content;
-      if (!formatted.trim().startsWith('<')) {
-        // If content is plain text, add paragraph tags
-        formatted = `<div style="font-family: Arial, sans-serif; line-height: 1.5;">${formatted
-          .split('\n\n')
-          .map(para => `<p>${para}</p>`)
-          .join('')}</div>`;
-      }
-      setDocumentContent(formatted);
+      setDocumentContent(content);
     }
   }, [content]);
-
-  const handleContentChange = () => {
-    if (editorRef.current) {
-      setDocumentContent(editorRef.current.innerHTML);
-    }
-  };
 
   const handlePrint = () => {
     try {
@@ -112,16 +97,16 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
         id: document.caseId || 'unknown',
         property: { address: { street: '', city: '', province: '', postalCode: '' } },
       };
-      
+
       const doc = generateCaseDocument(mockCase as any, document.type, documentContent);
       if (!doc) {
         throw new Error("Failed to generate document");
       }
-      
+
       const filename = document.title ? 
         `${document.title.replace(/\s+/g, '_')}.pdf` : 
         `Document_${document.id}.pdf`;
-      
+
       doc.save(filename);
       toast.success("Document downloaded successfully!");
     } catch (error) {
@@ -252,16 +237,10 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
             <div className="p-6">
               {isEditing ? (
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  className="outline-none prose prose-sm max-w-none dark:prose-invert min-h-[60vh] p-4 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700"
-                  dangerouslySetInnerHTML={{ __html: documentContent }}
-                  onInput={handleContentChange}
-                  style={{
-                    fontFamily: "Arial, sans-serif",
-                    lineHeight: 1.5
-                  }}
+                <RichTextEditor
+                  value={documentContent}
+                  onChange={setDocumentContent}
+                  minHeight="60vh"
                 />
               ) : (
                 <div 
@@ -278,3 +257,4 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 };
 
 export default DocumentViewer;
+
