@@ -13,8 +13,8 @@ import { useCase } from '@/hooks/useCase';
 import DocumentTypeSelect from './DocumentTypeSelect';
 import { 
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Undo, Redo, Mail, Printer, Download, FileText, Type, ListOrdered, 
-  List, Heading1, Heading2, Heading3, Indent, Outdent, Link, Image
+  Undo, Redo, Save, Printer, Download, FileText, Type, ListOrdered, 
+  List, Image, Link
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -65,22 +65,30 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [activeTab, setActiveTab] = useState('edit');
   const { currentCase } = useCase(selectedCase, caseId);
   const contentRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
+  const [editorHasFocus, setEditorHasFocus] = useState(false);
   
+  // Load templates and set default document title
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
     if (savedTemplates) {
-      const parsedTemplates = JSON.parse(savedTemplates);
-      setTemplates(parsedTemplates);
-      
-      const matchingTemplate = parsedTemplates.find((t: Template) => t.name === documentType);
-      if (matchingTemplate) {
-        setSelectedTemplate(matchingTemplate.id);
-        setContent(matchingTemplate.content);
-      } else {
-        setSelectedTemplate(null);
+      try {
+        const parsedTemplates = JSON.parse(savedTemplates);
+        setTemplates(parsedTemplates);
+        
+        const matchingTemplate = parsedTemplates.find((t: Template) => t.name === documentType);
+        if (matchingTemplate) {
+          setSelectedTemplate(matchingTemplate.id);
+          setContent(matchingTemplate.content);
+        } else {
+          setSelectedTemplate(null);
+          setContent('<p>Enter your document content here...</p>');
+        }
+      } catch (error) {
+        console.error("Failed to parse templates:", error);
         setContent('<p>Enter your document content here...</p>');
       }
     } else {
@@ -95,22 +103,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [documentType, currentCase]);
   
+  // Update content when template changes
   useEffect(() => {
     if (selectedTemplate !== null) {
       const template = templates.find(t => t.id === selectedTemplate);
       if (template) {
         setContent(template.content);
         if (!documentTitle && currentCase) {
-          setDocumentTitle(`${documentType} - ${currentCase.fileNumber} - ${format(new Date(), 'yyyy-MM-dd')}`);
+          setDocumentTitle(`${template.name} - ${currentCase.fileNumber} - ${format(new Date(), 'yyyy-MM-dd')}`);
         } else if (!documentTitle) {
-          setDocumentTitle(`${documentType} - ${format(new Date(), 'yyyy-MM-dd')}`);
+          setDocumentTitle(`${template.name} - ${format(new Date(), 'yyyy-MM-dd')}`);
         }
       }
-    } else if (templates.length > 0 && !content) {
-      setContent('<p>Enter your document content here...</p>');
     }
-  }, [selectedTemplate, templates, documentType]);
+  }, [selectedTemplate, templates]);
   
+  // Process template variables
   useEffect(() => {
     if (currentCase && content) {
       try {
@@ -125,52 +133,53 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [content, currentCase, activeTab]);
   
-  // Add focus and setup event listeners
+  // Setup editor focus handling and event listeners
   useEffect(() => {
     if (contentRef.current) {
-      contentRef.current.focus();
+      const editorElement = contentRef.current;
       
-      // Ensure contenteditable properly retains focus
-      const handleFocus = () => {
-        const selection = window.getSelection();
-        const range = document.createRange();
+      const handleEditorFocus = () => {
+        setEditorHasFocus(true);
         
-        // Place cursor at the end of the content
-        if (contentRef.current) {
-          range.selectNodeContents(contentRef.current);
-          range.collapse(false); // collapse to end
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-          
-          // Apply current font and size
-          document.execCommand('fontName', false, currentFont);
-          applyFontSize(currentFontSize);
-        }
+        // Apply current font and size
+        document.execCommand('fontName', false, currentFont);
+        applyFontSize(currentFontSize);
       };
       
-      contentRef.current.addEventListener('focus', handleFocus);
+      const handleEditorBlur = () => {
+        setEditorHasFocus(false);
+      };
       
       // Fix paste functionality to strip unwanted formatting
-      contentRef.current.addEventListener('paste', (e) => {
+      const handlePaste = (e: ClipboardEvent) => {
         e.preventDefault();
-        
-        // Get plain text from clipboard
-        const text = e.clipboardData?.getData('text/plain');
-        
-        if (text) {
-          // Insert text at cursor position
-          document.execCommand('insertText', false, text);
-        }
-      });
+        const text = e.clipboardData?.getData('text/plain') || '';
+        document.execCommand('insertText', false, text);
+      };
       
+      // Save selection position on keyup
+      const handleKeyUp = () => {
+        // Update content state with current HTML
+        setContent(editorElement.innerHTML);
+      };
+      
+      // Add event listeners
+      editorElement.addEventListener('focus', handleEditorFocus);
+      editorElement.addEventListener('blur', handleEditorBlur);
+      editorElement.addEventListener('paste', handlePaste);
+      editorElement.addEventListener('keyup', handleKeyUp);
+      
+      // Cleanup
       return () => {
-        if (contentRef.current) {
-          contentRef.current.removeEventListener('focus', handleFocus);
-        }
+        editorElement.removeEventListener('focus', handleEditorFocus);
+        editorElement.removeEventListener('blur', handleEditorBlur);
+        editorElement.removeEventListener('paste', handlePaste);
+        editorElement.removeEventListener('keyup', handleKeyUp);
       };
     }
   }, [contentRef.current, currentFont, currentFontSize]);
 
+  // Function to replace template variables with case data
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
@@ -194,6 +203,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       '{case.created_at}': caseData.createdAt ? format(new Date(caseData.createdAt), 'MMMM d, yyyy') : 'N/A'
     };
 
+    // Add party-specific variables
     if (caseData.parties && Array.isArray(caseData.parties)) {
       caseData.parties.forEach(party => {
         if (!party || !party.type) return;
@@ -210,6 +220,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       });
     }
 
+    // Add common party types if not already set
     if (!replacements['{lender.name}']) {
       const lender = caseData.parties?.find(p => 
         p.type.toLowerCase().includes('lender') || 
@@ -234,6 +245,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       }
     }
 
+    // Replace all variables in template
     let result = template;
     for (const [key, value] of Object.entries(replacements)) {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -244,71 +256,54 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     return result;
   };
 
+  // Text formatting helper functions
   const handleTextFormatting = (command: string, value: string = '') => {
     if (!contentRef.current) return;
     
     // Focus the editable div first
     contentRef.current.focus();
     
-    // Save selection
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    
     // Apply command
     document.execCommand(command, false, value);
     
     // Update content state
     setContent(contentRef.current.innerHTML);
-    
-    // Set focus back to the editor
-    contentRef.current.focus();
   };
   
+  // Apply font size with proper styling
   const applyFontSize = (size: string) => {
-    const fontSize = parseInt(size);
-    let htmlSize;
+    // Save current selection
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !contentRef.current) return;
     
-    // Map font sizes to HTML size values (approximate)
-    if (fontSize <= 9) htmlSize = '1';
-    else if (fontSize <= 11) htmlSize = '2';
-    else if (fontSize <= 14) htmlSize = '3';
-    else if (fontSize <= 18) htmlSize = '4';
-    else if (fontSize <= 24) htmlSize = '5';
-    else if (fontSize <= 36) htmlSize = '6';
-    else htmlSize = '7';
+    const range = selection.getRangeAt(0);
     
-    document.execCommand('fontSize', false, htmlSize);
-    
-    // Also apply inline style for more precise sizing
-    if (contentRef.current && window.getSelection) {
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount) {
-        const range = selection.getRangeAt(0);
-        const span = document.createElement('span');
-        span.style.fontSize = size;
-        
-        // If there's selected text, wrap it in the span
-        if (!range.collapsed) {
-          range.surroundContents(span);
-        } else {
-          // For cursor position, insert a character and apply style
-          span.innerHTML = '&#8203;'; // Zero-width space
-          range.insertNode(span);
-          
-          // Move cursor after the span
-          range.setStartAfter(span);
-          range.setEndAfter(span);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-      }
+    // If there's no selection, create a temporary marker
+    if (range.collapsed) {
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      span.innerHTML = '&#8203;'; // Zero-width space
+      range.insertNode(span);
+      
+      // Move cursor after the span
+      range.setStartAfter(span);
+      range.setEndAfter(span);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      // If text is selected, wrap it in a span with font size
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      range.surroundContents(span);
     }
     
+    // Update content state if contentRef exists
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);
     }
   };
   
+  // Document action handlers
   const handleSaveDocument = async () => {
     if (!currentCase) {
       toast.error("No case selected. Please select a case to save a document.");
@@ -471,6 +466,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     handleDownload();
   };
   
+  // Insert template variable at cursor position
   const insertVariable = (variable: string) => {
     if (contentRef.current) {
       contentRef.current.focus();
@@ -500,6 +496,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   };
 
+  // Font and font size handlers
   const handleSetFont = (font: string) => {
     setCurrentFont(font);
     
@@ -534,14 +531,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
             
             <Select 
-              value={selectedTemplate !== null ? selectedTemplate.toString() : ""} 
-              onValueChange={(value) => setSelectedTemplate(value !== "" ? parseInt(value) : null)}
+              value={selectedTemplate !== null ? selectedTemplate.toString() : "no-template"} 
+              onValueChange={(value) => setSelectedTemplate(value !== "no-template" ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select a template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Template</SelectItem>
+                <SelectItem value="no-template">No Template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}
@@ -562,11 +559,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             Print
           </Button>
           <Button variant="outline" onClick={handleEmail} disabled={!currentCase || !content}>
-            <Mail className="h-4 w-4 mr-1" />
+            <Link className="h-4 w-4 mr-1" />
             Email
           </Button>
           <Button onClick={handleSaveDocument} disabled={isGenerating || !currentCase || !content}>
-            <FileText className="h-4 w-4 mr-1" />
+            <Save className="h-4 w-4 mr-1" />
             {isGenerating ? "Saving..." : "Save"}
           </Button>
         </div>
@@ -655,31 +652,24 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="ghost" className="h-8 px-2">
-                    <Heading1 className="h-3.5 w-3.5" />
+                    <Type className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h1>')}>
-                    <Heading1 className="h-3.5 w-3.5 mr-2" /> Heading 1
+                    <Type className="h-3.5 w-3.5 mr-2" /> Heading 1
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h2>')}>
-                    <Heading2 className="h-3.5 w-3.5 mr-2" /> Heading 2
+                    <Type className="h-3.5 w-3.5 mr-2" /> Heading 2
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h3>')}>
-                    <Heading3 className="h-3.5 w-3.5 mr-2" /> Heading 3
+                    <Type className="h-3.5 w-3.5 mr-2" /> Heading 3
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<p>')}>
                     <Type className="h-3.5 w-3.5 mr-2" /> Paragraph
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
-              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('indent')} className="h-8 px-2">
-                <Indent className="h-3.5 w-3.5" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('outdent')} className="h-8 px-2">
-                <Outdent className="h-3.5 w-3.5" />
-              </Button>
             </div>
             
             <div className="h-6 border-r mx-1"></div>
@@ -830,18 +820,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             </Popover>
           </div>
           
-          <div 
-            ref={contentRef}
-            className="min-h-[500px] p-4 border rounded-md focus:outline-none whitespace-pre-wrap" 
-            contentEditable={true}
-            onInput={(e) => setContent((e.target as HTMLDivElement).innerHTML)}
-            dangerouslySetInnerHTML={{ __html: content }}
-            style={{ fontFamily: currentFont }}
-          />
+          <div ref={editorContainerRef} className="relative overflow-auto" style={{ maxHeight: "500px" }}>
+            <div 
+              ref={contentRef}
+              className="min-h-[500px] p-4 border rounded-md focus:outline-none whitespace-pre-wrap" 
+              contentEditable={true}
+              onInput={(e) => setContent((e.target as HTMLDivElement).innerHTML)}
+              dangerouslySetInnerHTML={{ __html: content }}
+              style={{ fontFamily: currentFont }}
+            />
+          </div>
         </TabsContent>
         
         <TabsContent value="preview" className="border rounded-md p-4">
-          <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap">
+          <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap overflow-auto" style={{ maxHeight: "500px" }}>
             {previewContent ? (
               <div style={{ fontFamily: currentFont }} dangerouslySetInnerHTML={{ __html: previewContent }} />
             ) : (
