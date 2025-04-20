@@ -46,10 +46,10 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
         
       if (error) throw error;
       if (data) {
-        setCases(data.map(c => ({ 
+        const casesData = data.map(c => ({ 
           id: c.id, 
           fileNumber: c.file_number,
-          status: '',
+          status: 'New' as const,  // Change from empty string to valid CaseStatus value
           createdAt: '',
           updatedAt: '',
           property: { address: { street: '', city: '', province: '', postalCode: '' }, pid: '', legal_description: '', propertyType: 'Residential' },
@@ -57,7 +57,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
           mortgage: { id: '', registrationNumber: '', principal: 0, interestRate: 0, startDate: '', currentBalance: 0, perDiemInterest: 0 },
           deadlines: [],
           documents: []
-        })));
+        }));
+        setCases(casesData);
       }
     } catch (error) {
       console.error('Error fetching cases:', error);
@@ -104,7 +105,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
               </SelectTrigger>
               <SelectContent>
                 {loadingCases ? (
-                  <SelectItem value="loading" disabled>Loading cases...</SelectItem>
+                  <SelectItem value="loading-placeholder">Loading cases...</SelectItem>
                 ) : cases.length > 0 ? (
                   cases.map(c => (
                     <SelectItem key={c.id} value={c.id}>
@@ -112,7 +113,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="none" disabled>No cases found</SelectItem>
+                  <SelectItem value="no-cases-found">No cases found</SelectItem>
                 )}
               </SelectContent>
             </Select>

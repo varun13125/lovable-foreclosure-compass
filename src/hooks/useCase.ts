@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Case } from '@/types';
+import { Case, CaseStatus } from '@/types';
 
 export const useCase = (initialCase: Case | null, caseId?: string) => {
   const [currentCase, setCurrentCase] = useState<Case | null>(initialCase);
@@ -88,7 +88,7 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
         const transformedCase: Case = {
           id: data.id,
           fileNumber: data.file_number,
-          status: data.status,
+          status: data.status as CaseStatus || 'New', // Ensure we have a valid CaseStatus 
           createdAt: data.created_at,
           updatedAt: data.updated_at,
           property: data.property ? {
