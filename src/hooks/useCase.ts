@@ -5,18 +5,28 @@ import { Case } from '@/types';
 
 export const useCase = (initialCase: Case | null, caseId?: string) => {
   const [currentCase, setCurrentCase] = useState<Case | null>(initialCase);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialCase) {
+      console.log("Using provided case data:", initialCase.fileNumber);
       setCurrentCase(initialCase);
-      console.log("Selected Case:", initialCase);
     } else if (caseId) {
+      console.log("Fetching case by ID:", caseId);
       fetchCaseById(caseId);
+    } else {
+      console.log("No case data or ID provided");
+      setCurrentCase(null);
     }
   }, [initialCase, caseId]);
 
   const fetchCaseById = async (id: string) => {
     try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Fetching case data for ID:", id);
       const { data, error } = await supabase
         .from('cases')
         .select(`
@@ -66,6 +76,8 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
       if (error) throw error;
 
       if (data) {
+        console.log("Case data fetched successfully:", data.file_number);
+        
         const transformedCase: Case = {
           id: data.id,
           fileNumber: data.file_number,
@@ -112,12 +124,20 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
             judgeName: data.judge_name || ''
           }
         };
+        console.log("Transformed case data:", transformedCase.fileNumber);
         setCurrentCase(transformedCase);
+      } else {
+        console.log("No case data found for ID:", id);
+        setCurrentCase(null);
       }
     } catch (error) {
       console.error("Error fetching case:", error);
+      setError("Failed to fetch case data");
+      setCurrentCase(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  return { currentCase, setCurrentCase };
+  return { currentCase, setCurrentCase, loading, error };
 };

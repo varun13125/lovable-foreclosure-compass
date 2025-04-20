@@ -13,14 +13,21 @@ declare module 'jspdf' {
 
 // Function to replace template variables with actual data
 const replaceTemplateVariables = (template: string, currentCase: Case): string => {
+  if (!currentCase) {
+    console.error("No case data provided to replace template variables");
+    return template;
+  }
+  
+  console.log("Replacing variables for case:", currentCase.fileNumber);
+  
   const replacements: Record<string, string> = {
     '{date}': format(new Date(), 'MMMM d, yyyy'),
     '{property.address}': `${currentCase.property.address.street}, ${currentCase.property.address.city}, ${currentCase.property.address.province} ${currentCase.property.address.postalCode}`,
-    '{mortgage.number}': currentCase.mortgage.registrationNumber,
-    '{mortgage.balance}': currentCase.mortgage.currentBalance.toLocaleString(),
-    '{mortgage.principal}': currentCase.mortgage.principal.toLocaleString(),
-    '{mortgage.per_diem}': currentCase.mortgage.perDiemInterest.toFixed(2),
-    '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate}%`,
+    '{mortgage.number}': currentCase.mortgage.registrationNumber || 'N/A',
+    '{mortgage.balance}': (currentCase.mortgage.currentBalance || 0).toLocaleString(),
+    '{mortgage.principal}': (currentCase.mortgage.principal || 0).toLocaleString(),
+    '{mortgage.per_diem}': (currentCase.mortgage.perDiemInterest || 0).toFixed(2),
+    '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate || 0}%`,
     '{mortgage.arrears}': currentCase.mortgage.arrears?.toLocaleString() || 'N/A',
     '{court.file_number}': currentCase.court?.fileNumber || 'N/A',
     '{court.registry}': currentCase.court?.registry || 'N/A',
@@ -28,46 +35,54 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
       ? format(new Date(currentCase.court.hearingDate), 'MMMM d, yyyy') 
       : 'N/A',
     '{court.judge_name}': currentCase.court?.judgeName || 'N/A',
-    '{case.file_number}': currentCase.fileNumber,
-    '{case.status}': currentCase.status,
-    '{case.created_at}': format(new Date(currentCase.createdAt), 'MMMM d, yyyy')
+    '{case.file_number}': currentCase.fileNumber || 'N/A',
+    '{case.status}': currentCase.status || 'N/A',
+    '{case.created_at}': currentCase.createdAt ? format(new Date(currentCase.createdAt), 'MMMM d, yyyy') : 'N/A'
   };
 
   // Add parties dynamically
-  currentCase.parties.forEach(party => {
-    const type = party.type.toLowerCase();
-    replacements[`{${type}.name}`] = party.name;
-    replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
-    replacements[`{${type}.phone}`] = party.contactInfo.phone || 'N/A';
-    if (party.contactInfo.address) {
-      replacements[`{${type}.address}`] = party.contactInfo.address;
-    }
-  });
+  if (currentCase.parties && Array.isArray(currentCase.parties)) {
+    currentCase.parties.forEach(party => {
+      if (!party || !party.type) return;
+      
+      const type = party.type.toLowerCase();
+      replacements[`{${type}.name}`] = party.name || 'N/A';
+      if (party.contactInfo) {
+        replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
+        replacements[`{${type}.phone}`] = party.contactInfo.phone || 'N/A';
+        if (party.contactInfo.address) {
+          replacements[`{${type}.address}`] = party.contactInfo.address;
+        }
+      }
+    });
+  }
 
   // Find lender/borrower if not found in specific types
   if (!replacements['{lender.name}']) {
-    const lender = currentCase.parties.find(p => 
+    const lender = currentCase.parties?.find(p => 
       p.type.toLowerCase().includes('lender') || 
       p.type.toLowerCase().includes('mortgagee')
     );
     if (lender) {
-      replacements['{lender.name}'] = lender.name;
-      replacements['{lender.email}'] = lender.contactInfo.email || 'N/A';
-      replacements['{lender.phone}'] = lender.contactInfo.phone || 'N/A';
+      replacements['{lender.name}'] = lender.name || 'N/A';
+      replacements['{lender.email}'] = lender.contactInfo?.email || 'N/A';
+      replacements['{lender.phone}'] = lender.contactInfo?.phone || 'N/A';
     }
   }
   
   if (!replacements['{borrower.name}']) {
-    const borrower = currentCase.parties.find(p => 
+    const borrower = currentCase.parties?.find(p => 
       p.type.toLowerCase().includes('borrower') || 
       p.type.toLowerCase().includes('mortgagor')
     );
     if (borrower) {
-      replacements['{borrower.name}'] = borrower.name;
-      replacements['{borrower.email}'] = borrower.contactInfo.email || 'N/A';
-      replacements['{borrower.phone}'] = borrower.contactInfo.phone || 'N/A';
+      replacements['{borrower.name}'] = borrower.name || 'N/A';
+      replacements['{borrower.email}'] = borrower.contactInfo?.email || 'N/A';
+      replacements['{borrower.phone}'] = borrower.contactInfo?.phone || 'N/A';
     }
   }
+
+  console.log("Variable replacements:", replacements);
 
   // Replace all variables in the template with regex to catch all occurrences
   let result = template;
@@ -124,10 +139,18 @@ const cleanHtmlContent = (html: string): string => {
 };
 
 export const generateCaseDocument = (currentCase: Case, documentType: string, template?: string) => {
+  if (!currentCase) {
+    console.error("Cannot generate document: No case data provided");
+    return null;
+  }
+  
+  console.log("Generating document for case:", currentCase.fileNumber);
   const doc = new jsPDF();
   
   if (template) {
-    // Process template-based document
+    // Process the template with case data
+    const processedTemplate = replaceTemplateVariables(template, currentCase);
+    
     // Set default font
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(12);
@@ -144,7 +167,7 @@ export const generateCaseDocument = (currentCase: Case, documentType: string, te
     doc.setFont('helvetica', 'normal');
     
     // Convert HTML content to text, preserving structure as much as possible
-    const cleanContent = cleanHtmlContent(template);
+    const cleanContent = cleanHtmlContent(processedTemplate);
     const lines = cleanContent.split('\n');
     
     let yPos = 40;
