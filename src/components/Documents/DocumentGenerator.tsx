@@ -8,6 +8,8 @@ import { generateCaseDocument } from '@/utils/pdfGenerator';
 import { uploadDocument } from '@/services/documentService';
 import DocumentTypeSelect from './DocumentTypeSelect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DocumentEditor from './DocumentEditor';
 
 interface DocumentGeneratorProps {
   selectedCase: Case | null;
@@ -26,6 +28,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
   const [isGenerating, setIsGenerating] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("quick");
   const { currentCase } = useCase(selectedCase, caseId);
 
   // Load templates from local storage
@@ -83,41 +86,58 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-4">Generate Document</h2>
-      
-      <div className="space-y-4">
-        <div>
-          <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="quick">Quick Generate</TabsTrigger>
+          <TabsTrigger value="editor">Document Editor</TabsTrigger>
+        </TabsList>
         
-        <div>
-          <label className="block text-sm font-medium mb-2">Template</label>
-          <Select 
-            value={selectedTemplate?.toString() || "default"} 
-            onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a template" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default Template</SelectItem>
-              {templates.map((template) => (
-                <SelectItem key={template.id} value={template.id.toString()}>
-                  {template.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <TabsContent value="quick">
+          <div className="space-y-4 p-4">
+            <h2 className="text-lg font-semibold mb-4">Generate Document</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Template</label>
+                <Select 
+                  value={selectedTemplate?.toString() || "default"} 
+                  onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default Template</SelectItem>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id.toString()}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button 
+                onClick={generateDocument} 
+                disabled={isGenerating || !currentCase}
+                className="w-full"
+              >
+                {isGenerating ? "Generating..." : "Generate Document"}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
         
-        <Button 
-          onClick={generateDocument} 
-          disabled={isGenerating || !currentCase}
-          className="w-full"
-        >
-          {isGenerating ? "Generating..." : "Generate Document"}
-        </Button>
-      </div>
+        <TabsContent value="editor">
+          <div className="p-4">
+            <DocumentEditor selectedCase={selectedCase} caseId={caseId} />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
