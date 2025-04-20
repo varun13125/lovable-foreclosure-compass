@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -68,7 +67,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [previewContent, setPreviewContent] = useState<string>('');
   const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
-  const [variableToInsert, setVariableToInsert] = useState<string>('');
   
   // Load templates from local storage
   useEffect(() => {
@@ -383,14 +381,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
             
             <Select 
-              value={selectedTemplate?.toString() || ""} 
-              onValueChange={(value) => setSelectedTemplate(value !== "" ? parseInt(value) : null)}
+              value={selectedTemplate?.toString() || "default"} 
+              onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select a template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Template</SelectItem>
+                <SelectItem value="default">No Template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}

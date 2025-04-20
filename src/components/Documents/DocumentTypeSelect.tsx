@@ -1,4 +1,5 @@
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DocumentType } from '@/types';
 
 interface DocumentTypeSelectProps {
@@ -7,25 +8,30 @@ interface DocumentTypeSelectProps {
 }
 
 const DocumentTypeSelect = ({ value, onChange }: DocumentTypeSelectProps) => {
+  const documentTypes: DocumentType[] = [
+    'Demand Letter',
+    'Petition',
+    'Order Nisi',
+    'Conduct of Sale',
+    'Affidavit',
+    'Final Order',
+    'Other'
+  ];
+
   return (
-    <div className="mb-4">
-      <label htmlFor="documentType" className="block text-sm font-medium text-gray-700">
-        Document Type:
-      </label>
-      <select
-        id="documentType"
-        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-        value={value}
-        onChange={(e) => onChange(e.target.value as DocumentType)}
-      >
-        <option>Demand Letter</option>
-        <option>Petition</option>
-        <option>Order Nisi</option>
-        <option>Conduct of Sale</option>
-        <option>Affidavit</option>
-        <option>Final Order</option>
-        <option>Other</option>
-      </select>
+    <div className="w-48">
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Document Type" />
+        </SelectTrigger>
+        <SelectContent>
+          {documentTypes.map((type) => (
+            <SelectItem key={type} value={type}>
+              {type}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 };
