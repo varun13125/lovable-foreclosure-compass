@@ -63,7 +63,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
             }, 
             pid: '', 
             legal_description: '', 
-            propertyType: 'Residential' 
+            propertyType: 'Residential' as const // Explicitly type as "Residential"
           },
           parties: [],
           mortgage: { 

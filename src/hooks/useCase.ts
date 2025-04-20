@@ -109,7 +109,7 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
             },
             pid: data.property.pid || "",
             legal_description: data.property.legal_description || "",
-            propertyType: data.property.property_type || "Residential"
+            propertyType: (data.property.property_type || "Residential") as "Residential" | "Commercial" | "Land" | "Other"
           } : {
             id: '',
             address: { street: '', city: '', province: '', postalCode: '' },
