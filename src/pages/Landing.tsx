@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -132,7 +131,7 @@ export default function Landing() {
                   <Button 
                     size="lg" 
                     variant="outline" 
-                    className="border-white text-white hover:bg-white/10"
+                    className="border-white text-white hover:bg-white/10 bg-law-teal/30"
                   >
                     Schedule Demo
                   </Button>

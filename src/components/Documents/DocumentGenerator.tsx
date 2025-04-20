@@ -39,19 +39,11 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
       const matchingTemplate = parsedTemplates.find((t: Template) => t.name === documentType);
       if (matchingTemplate) {
         setSelectedTemplate(matchingTemplate.id);
+      } else {
+        setSelectedTemplate(null);
       }
     }
   }, [documentType]);
-
-  // Update selected template when document type changes
-  useEffect(() => {
-    const matchingTemplate = templates.find(t => t.name === documentType);
-    if (matchingTemplate) {
-      setSelectedTemplate(matchingTemplate.id);
-    } else {
-      setSelectedTemplate(null);
-    }
-  }, [documentType, templates]);
 
   const generateDocument = async () => {
     if (!currentCase) {
@@ -101,8 +93,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
         <div>
           <label className="block text-sm font-medium mb-2">Template</label>
           <Select 
-            value={selectedTemplate?.toString() || undefined} 
-            onValueChange={(value) => setSelectedTemplate(value ? parseInt(value) : null)}
+            value={selectedTemplate?.toString() || "default"} 
+            onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a template" />

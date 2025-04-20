@@ -21,6 +21,7 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
     '{mortgage.principal}': currentCase.mortgage.principal.toLocaleString(),
     '{mortgage.per_diem}': currentCase.mortgage.perDiemInterest.toFixed(2),
     '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate}%`,
+    '{mortgage.arrears}': currentCase.mortgage.arrears?.toLocaleString() || 'N/A',
     '{court.file_number}': currentCase.court?.fileNumber || 'N/A',
     '{court.registry}': currentCase.court?.registry || 'N/A',
     '{court.hearing_date}': currentCase.court?.hearingDate 
@@ -42,6 +43,31 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
       replacements[`{${type}.address}`] = party.contactInfo.address;
     }
   });
+
+  // Find lender/borrower if not found in specific types
+  if (!replacements['{lender.name}']) {
+    const lender = currentCase.parties.find(p => 
+      p.type.toLowerCase().includes('lender') || 
+      p.type.toLowerCase().includes('mortgagee')
+    );
+    if (lender) {
+      replacements['{lender.name}'] = lender.name;
+      replacements['{lender.email}'] = lender.contactInfo.email || 'N/A';
+      replacements['{lender.phone}'] = lender.contactInfo.phone || 'N/A';
+    }
+  }
+  
+  if (!replacements['{borrower.name}']) {
+    const borrower = currentCase.parties.find(p => 
+      p.type.toLowerCase().includes('borrower') || 
+      p.type.toLowerCase().includes('mortgagor')
+    );
+    if (borrower) {
+      replacements['{borrower.name}'] = borrower.name;
+      replacements['{borrower.email}'] = borrower.contactInfo.email || 'N/A';
+      replacements['{borrower.phone}'] = borrower.contactInfo.phone || 'N/A';
+    }
+  }
 
   // Replace all variables in the template
   let result = template;
@@ -84,7 +110,7 @@ export const generateCaseDocument = (currentCase: Case, documentType: string, te
       }
       
       // Check if line should be a header
-      if (line.toUpperCase() === line && line.length > 10) {
+      if (line.toUpperCase() === line && line.trim().length > 10) {
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text(line, 20, yPos);
