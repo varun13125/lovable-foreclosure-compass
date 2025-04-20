@@ -26,15 +26,18 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
     '{court.hearing_date}': currentCase.court?.hearingDate 
       ? format(new Date(currentCase.court.hearingDate), 'MMMM d, yyyy') 
       : 'N/A',
-    '{court.judge_name}': currentCase.court?.judgeName || 'N/A'
+    '{court.judge_name}': currentCase.court?.judgeName || 'N/A',
+    '{case.file_number}': currentCase.fileNumber,
+    '{case.status}': currentCase.status,
+    '{case.created_at}': format(new Date(currentCase.createdAt), 'MMMM d, yyyy')
   };
 
   // Add parties dynamically
   currentCase.parties.forEach(party => {
     const type = party.type.toLowerCase();
     replacements[`{${type}.name}`] = party.name;
-    replacements[`{${type}.email}`] = party.contactInfo.email;
-    replacements[`{${type}.phone}`] = party.contactInfo.phone;
+    replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
+    replacements[`{${type}.phone}`] = party.contactInfo.phone || 'N/A';
     if (party.contactInfo.address) {
       replacements[`{${type}.address}`] = party.contactInfo.address;
     }
@@ -58,6 +61,20 @@ export const generateCaseDocument = (currentCase: Case, documentType: string, te
     const lines = processedContent.split('\n');
     
     let yPos = 20;
+    doc.setFontSize(12);
+    
+    // Add document header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${documentType}`, 105, yPos, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    yPos += 15;
+    
+    // Add date
+    doc.setFontSize(10);
+    doc.text(`Generated: ${format(new Date(), 'MMMM d, yyyy')}`, 195, yPos, { align: 'right' });
+    yPos += 15;
+    
     doc.setFontSize(12);
     
     lines.forEach(line => {

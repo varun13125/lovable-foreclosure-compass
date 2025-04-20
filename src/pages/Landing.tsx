@@ -8,12 +8,54 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, Shield, Users, BarChart3, Scale, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+const scheduleFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  company: z.string().min(1, "Company name is required"),
+  phone: z.string().min(10, "Please enter a valid phone number"),
+  preferredDate: z.string().min(1, "Please select a preferred date"),
+});
+
+type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
 
 export default function Landing() {
   const navigate = useNavigate();
   const { authState, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  
+  const scheduleForm = useForm<ScheduleFormValues>({
+    resolver: zodResolver(scheduleFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      company: "",
+      phone: "",
+      preferredDate: "",
+    },
+  });
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +68,20 @@ export default function Landing() {
     const { error } = await signIn(email, password);
     if (!error) {
       navigate("/dashboard");
+    }
+  };
+  
+  const handleScheduleDemo = async (values: ScheduleFormValues) => {
+    setIsScheduling(true);
+    try {
+      // This would normally send the data to your backend
+      console.log("Schedule demo data:", values);
+      toast.success("Demo scheduled successfully! We'll contact you soon.");
+      scheduleForm.reset();
+    } catch (error) {
+      toast.error("Failed to schedule demo. Please try again.");
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -70,13 +126,116 @@ export default function Landing() {
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-white text-white hover:bg-white/10"
-              >
-                Schedule Demo
-              </Button>
+              
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    className="border-white text-white hover:bg-white/10"
+                  >
+                    Schedule Demo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Schedule a Demo</DialogTitle>
+                    <DialogDescription>
+                      Fill out the form below to schedule a personalized demo of LegalFlow.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <Form {...scheduleForm}>
+                    <form onSubmit={scheduleForm.handleSubmit(handleScheduleDemo)} className="space-y-4 py-4">
+                      <FormField
+                        control={scheduleForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Smith" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={scheduleForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input placeholder="email@example.com" type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={scheduleForm.control}
+                        name="company"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company/Firm Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Your Law Firm" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={scheduleForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="(555) 123-4567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={scheduleForm.control}
+                        name="preferredDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Preferred Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="flex justify-end gap-2 pt-2">
+                        <DialogClose asChild>
+                          <Button variant="outline" type="button">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={isScheduling}>
+                          {isScheduling ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Scheduling...
+                            </>
+                          ) : (
+                            "Schedule Demo"
+                          )}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
           
