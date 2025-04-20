@@ -46,15 +46,35 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
         
       if (error) throw error;
       if (data) {
+        // Make sure we create proper Case objects with all required properties
         const casesData = data.map(c => ({ 
           id: c.id, 
           fileNumber: c.file_number,
-          status: 'New' as const,  // Change from empty string to valid CaseStatus value
+          status: 'New' as const,  // Valid CaseStatus value
           createdAt: '',
           updatedAt: '',
-          property: { address: { street: '', city: '', province: '', postalCode: '' }, pid: '', legal_description: '', propertyType: 'Residential' },
+          property: { 
+            id: 'temp-id', // Add required id property
+            address: { 
+              street: '', 
+              city: '', 
+              province: '', 
+              postalCode: '' 
+            }, 
+            pid: '', 
+            legal_description: '', 
+            propertyType: 'Residential' 
+          },
           parties: [],
-          mortgage: { id: '', registrationNumber: '', principal: 0, interestRate: 0, startDate: '', currentBalance: 0, perDiemInterest: 0 },
+          mortgage: { 
+            id: '', 
+            registrationNumber: '', 
+            principal: 0, 
+            interestRate: 0, 
+            startDate: '', 
+            currentBalance: 0, 
+            perDiemInterest: 0 
+          },
           deadlines: [],
           documents: []
         }));

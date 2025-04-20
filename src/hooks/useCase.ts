@@ -85,14 +85,22 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
       if (data) {
         console.log("Case data fetched successfully:", data.file_number);
         
+        // Ensure we have a valid CaseStatus - use 'New' as fallback if status is missing or invalid
+        const validStatus: CaseStatus = 
+          (data.status && 
+           ['New', 'Demand Letter Sent', 'Petition Filed', 'Order Nisi Granted', 
+            'Redemption Period', 'Sale Process', 'Closed'].includes(data.status)) 
+          ? data.status as CaseStatus 
+          : 'New';
+            
         const transformedCase: Case = {
           id: data.id,
           fileNumber: data.file_number,
-          status: data.status as CaseStatus || 'New', // Ensure we have a valid CaseStatus 
+          status: validStatus,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
           property: data.property ? {
-            id: data.property.id,
+            id: data.property.id || "",
             address: {
               street: data.property.street || "",
               city: data.property.city || "",
