@@ -71,6 +71,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
   const [editorHasFocus, setEditorHasFocus] = useState(false);
   const [cursorPosition, setCursorPosition] = useState<Range | null>(null);
+  const [lastScrollTop, setLastScrollTop] = useState(0);
+  const [previousSelection, setPreviousSelection] = useState<{start: number, end: number} | null>(null);
   
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
@@ -137,9 +139,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       const handleEditorFocus = () => {
         setEditorHasFocus(true);
         
+        // Apply font settings to restore state
         document.execCommand('fontName', false, currentFont);
         applyFontSize(currentFontSize);
         
+        // Restore cursor position if available
         if (cursorPosition) {
           const selection = window.getSelection();
           if (selection) {
@@ -152,6 +156,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       const handleEditorBlur = () => {
         setEditorHasFocus(false);
         
+        // Save cursor position on blur
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           setCursorPosition(selection.getRangeAt(0).cloneRange());
@@ -165,14 +170,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       };
       
       const handleKeyUp = (e: KeyboardEvent) => {
+        // Store current content
         setContent(editorElement.innerHTML);
         
+        // Save cursor position
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
-          setCursorPosition(selection.getRangeAt(0).cloneRange());
+          const range = selection.getRangeAt(0).cloneRange();
+          setCursorPosition(range);
+          
+          // Prevent event bubbling
+          e.stopPropagation();
         }
-        
-        e.stopPropagation();
       };
       
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -180,14 +189,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       };
       
       const handleInput = (e: Event) => {
+        // Update content state
         setContent(editorElement.innerHTML);
         
+        // Maintain cursor position
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           setCursorPosition(selection.getRangeAt(0).cloneRange());
         }
         
         e.stopPropagation();
+      };
+      
+      // Prevent scroll reset on content change
+      const handleScroll = (e: Event) => {
+        const target = e.target as HTMLElement;
+        setLastScrollTop(target.scrollTop);
       };
       
       editorElement.addEventListener('focus', handleEditorFocus);
@@ -196,6 +213,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       editorElement.addEventListener('keyup', handleKeyUp);
       editorElement.addEventListener('keydown', handleKeyDown);
       editorElement.addEventListener('input', handleInput);
+      editorElement.addEventListener('scroll', handleScroll);
+      
+      // Initial focus if needed
+      if (editorHasFocus && document.activeElement !== editorElement) {
+        editorElement.focus();
+      }
       
       return () => {
         editorElement.removeEventListener('focus', handleEditorFocus);
@@ -204,10 +227,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         editorElement.removeEventListener('keyup', handleKeyUp);
         editorElement.removeEventListener('keydown', handleKeyDown);
         editorElement.removeEventListener('input', handleInput);
+        editorElement.removeEventListener('scroll', handleScroll);
       };
     }
-  }, [contentRef.current, currentFont, currentFontSize, cursorPosition]);
+  }, [contentRef.current, currentFont, currentFontSize, cursorPosition, editorHasFocus]);
   
+  // Maintain scroll position after content changes
+  useEffect(() => {
+    if (contentRef.current && lastScrollTop > 0) {
+      contentRef.current.scrollTop = lastScrollTop;
+    }
+  }, [content, lastScrollTop]);
+
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
@@ -284,11 +315,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const handleTextFormatting = (command: string, value: string = '') => {
     if (!contentRef.current) return;
     
+    // Focus and run command
     contentRef.current.focus();
     document.execCommand(command, false, value);
     
+    // Update content state
     setContent(contentRef.current.innerHTML);
     
+    // Save cursor position
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       setCursorPosition(selection.getRangeAt(0).cloneRange());
@@ -304,7 +338,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     if (range.collapsed) {
       const span = document.createElement('span');
       span.style.fontSize = size;
-      span.innerHTML = '&#8203;';
+      span.innerHTML = '&#8203;'; // Zero-width space
       range.insertNode(span);
       
       range.setStartAfter(span);
@@ -318,8 +352,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
     
     if (contentRef.current) {
+      // Update content state
       setContent(contentRef.current.innerHTML);
       
+      // Save updated cursor position
       const newSelection = window.getSelection();
       if (newSelection && newSelection.rangeCount > 0) {
         setCursorPosition(newSelection.getRangeAt(0).cloneRange());
@@ -503,15 +539,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         range.deleteContents();
         range.insertNode(span);
         
+        // Move cursor after variable
         range.setStartAfter(span);
         range.setEndAfter(span);
         selection.removeAllRanges();
         selection.addRange(range);
         
+        // Add a space after variable
         document.execCommand('insertText', false, ' ');
         
+        // Update content state
         setContent(contentRef.current.innerHTML);
         
+        // Save cursor position
         const newSelection = window.getSelection();
         if (newSelection && newSelection.rangeCount > 0) {
           setCursorPosition(newSelection.getRangeAt(0).cloneRange());
@@ -528,6 +568,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       document.execCommand('fontName', false, font);
       setContent(contentRef.current.innerHTML);
       
+      // Save cursor position after font change
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         setCursorPosition(selection.getRangeAt(0).cloneRange());
@@ -782,100 +823,4 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{case.file_number}')}
-                      >
-                        {'{case.file_number}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{lender.name}')}
-                      >
-                        {'{lender.name}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{borrower.name}')}
-                      >
-                        {'{borrower.name}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{borrower.email}')}
-                      >
-                        {'{borrower.email}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{borrower.phone}')}
-                      >
-                        {'{borrower.phone}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{court.file_number}')}
-                      >
-                        {'{court.file_number}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{court.registry}')}
-                      >
-                        {'{court.registry}'}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="justify-start text-left text-xs h-7"
-                        onClick={() => insertVariable('{court.hearing_date}')}
-                      >
-                        {'{court.hearing_date}'}
-                      </Button>
-                    </div>
-                  </ScrollArea>
-                </Card>
-              </PopoverContent>
-            </Popover>
-          </div>
-          
-          <div ref={editorContainerRef} className="h-[500px] relative overflow-hidden">
-            <div 
-              ref={contentRef}
-              className="h-full p-4 border rounded-md focus:outline-none whitespace-pre-wrap overflow-auto" 
-              contentEditable={true}
-              suppressContentEditableWarning={true}
-              dangerouslySetInnerHTML={{ __html: content }}
-              style={{ fontFamily: currentFont }}
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="preview" className="border rounded-md p-4">
-          <ScrollArea className="h-[500px]">
-            <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap">
-              {previewContent ? (
-                <div style={{ fontFamily: currentFont }} dangerouslySetInnerHTML={{ __html: previewContent }} />
-              ) : (
-                <p className="text-muted-foreground">Preview will appear here...</p>
-              )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-export default DocumentEditor;
+                        className="justify-start text-
