@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Case, DocumentType } from '@/types';
 import { generateCaseDocument } from '@/utils/pdfGenerator';
 import { uploadDocument } from '@/services/documentService';
@@ -71,7 +71,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
   const [editorHasFocus, setEditorHasFocus] = useState(false);
   
-  // Load templates and set default document title
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
     if (savedTemplates) {
@@ -95,7 +94,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       setContent('<p>Enter your document content here...</p>');
     }
     
-    // Set default document title
     if (!documentTitle && currentCase) {
       setDocumentTitle(`${documentType} - ${currentCase.fileNumber} - ${format(new Date(), 'yyyy-MM-dd')}`);
     } else if (!documentTitle) {
@@ -103,7 +101,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [documentType, currentCase]);
   
-  // Update content when template changes
   useEffect(() => {
     if (selectedTemplate !== null) {
       const template = templates.find(t => t.id === selectedTemplate);
@@ -118,7 +115,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [selectedTemplate, templates]);
   
-  // Process template variables
   useEffect(() => {
     if (currentCase && content) {
       try {
@@ -133,7 +129,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [content, currentCase, activeTab]);
   
-  // Setup editor focus handling and event listeners
   useEffect(() => {
     if (contentRef.current) {
       const editorElement = contentRef.current;
@@ -141,7 +136,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       const handleEditorFocus = () => {
         setEditorHasFocus(true);
         
-        // Apply current font and size
         document.execCommand('fontName', false, currentFont);
         applyFontSize(currentFontSize);
       };
@@ -150,36 +144,37 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         setEditorHasFocus(false);
       };
       
-      // Fix paste functionality to strip unwanted formatting
       const handlePaste = (e: ClipboardEvent) => {
         e.preventDefault();
         const text = e.clipboardData?.getData('text/plain') || '';
         document.execCommand('insertText', false, text);
       };
       
-      // Save selection position on keyup
-      const handleKeyUp = () => {
-        // Update content state with current HTML
+      const handleKeyUp = (e: KeyboardEvent) => {
         setContent(editorElement.innerHTML);
+        e.stopPropagation();
       };
       
-      // Add event listeners
+      const handleKeyDown = (e: KeyboardEvent) => {
+        e.stopPropagation();
+      };
+      
       editorElement.addEventListener('focus', handleEditorFocus);
       editorElement.addEventListener('blur', handleEditorBlur);
       editorElement.addEventListener('paste', handlePaste);
       editorElement.addEventListener('keyup', handleKeyUp);
+      editorElement.addEventListener('keydown', handleKeyDown);
       
-      // Cleanup
       return () => {
         editorElement.removeEventListener('focus', handleEditorFocus);
         editorElement.removeEventListener('blur', handleEditorBlur);
         editorElement.removeEventListener('paste', handlePaste);
         editorElement.removeEventListener('keyup', handleKeyUp);
+        editorElement.removeEventListener('keydown', handleKeyDown);
       };
     }
   }, [contentRef.current, currentFont, currentFontSize]);
-
-  // Function to replace template variables with case data
+  
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
@@ -203,7 +198,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       '{case.created_at}': caseData.createdAt ? format(new Date(caseData.createdAt), 'MMMM d, yyyy') : 'N/A'
     };
 
-    // Add party-specific variables
     if (caseData.parties && Array.isArray(caseData.parties)) {
       caseData.parties.forEach(party => {
         if (!party || !party.type) return;
@@ -220,7 +214,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       });
     }
 
-    // Add common party types if not already set
     if (!replacements['{lender.name}']) {
       const lender = caseData.parties?.find(p => 
         p.type.toLowerCase().includes('lender') || 
@@ -245,7 +238,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       }
     }
 
-    // Replace all variables in template
     let result = template;
     for (const [key, value] of Object.entries(replacements)) {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -256,54 +248,41 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     return result;
   };
 
-  // Text formatting helper functions
   const handleTextFormatting = (command: string, value: string = '') => {
     if (!contentRef.current) return;
     
-    // Focus the editable div first
     contentRef.current.focus();
-    
-    // Apply command
     document.execCommand(command, false, value);
-    
-    // Update content state
     setContent(contentRef.current.innerHTML);
   };
   
-  // Apply font size with proper styling
   const applyFontSize = (size: string) => {
-    // Save current selection
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || !contentRef.current) return;
     
     const range = selection.getRangeAt(0);
     
-    // If there's no selection, create a temporary marker
     if (range.collapsed) {
       const span = document.createElement('span');
       span.style.fontSize = size;
-      span.innerHTML = '&#8203;'; // Zero-width space
+      span.innerHTML = '&#8203;';
       range.insertNode(span);
       
-      // Move cursor after the span
       range.setStartAfter(span);
       range.setEndAfter(span);
       selection.removeAllRanges();
       selection.addRange(range);
     } else {
-      // If text is selected, wrap it in a span with font size
       const span = document.createElement('span');
       span.style.fontSize = size;
       range.surroundContents(span);
     }
     
-    // Update content state if contentRef exists
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);
     }
   };
-  
-  // Document action handlers
+
   const handleSaveDocument = async () => {
     if (!currentCase) {
       toast.error("No case selected. Please select a case to save a document.");
@@ -465,8 +444,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     
     handleDownload();
   };
-  
-  // Insert template variable at cursor position
+
   const insertVariable = (variable: string) => {
     if (contentRef.current) {
       contentRef.current.focus();
@@ -481,22 +459,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         range.deleteContents();
         range.insertNode(span);
         
-        // Move cursor after the inserted variable
         range.setStartAfter(span);
         range.setEndAfter(span);
         selection.removeAllRanges();
         selection.addRange(range);
         
-        // Insert a space after the variable for better editing
         document.execCommand('insertText', false, ' ');
         
-        // Update content state
         setContent(contentRef.current.innerHTML);
       }
     }
   };
 
-  // Font and font size handlers
   const handleSetFont = (font: string) => {
     setCurrentFont(font);
     
@@ -693,153 +667,160 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
                 <Card>
-                  <div className="p-2 max-h-60 overflow-y-auto grid grid-cols-2 gap-1">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{date}')}
-                    >
-                      {'{date}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{property.address}')}
-                    >
-                      {'{property.address}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{mortgage.number}')}
-                    >
-                      {'{mortgage.number}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{mortgage.balance}')}
-                    >
-                      {'{mortgage.balance}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{mortgage.principal}')}
-                    >
-                      {'{mortgage.principal}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{mortgage.per_diem}')}
-                    >
-                      {'{mortgage.per_diem}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{mortgage.interest_rate}')}
-                    >
-                      {'{mortgage.interest_rate}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{case.file_number}')}
-                    >
-                      {'{case.file_number}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{lender.name}')}
-                    >
-                      {'{lender.name}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{borrower.name}')}
-                    >
-                      {'{borrower.name}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{borrower.email}')}
-                    >
-                      {'{borrower.email}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{borrower.phone}')}
-                    >
-                      {'{borrower.phone}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{court.file_number}')}
-                    >
-                      {'{court.file_number}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{court.registry}')}
-                    >
-                      {'{court.registry}'}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="justify-start text-left text-xs h-7"
-                      onClick={() => insertVariable('{court.hearing_date}')}
-                    >
-                      {'{court.hearing_date}'}
-                    </Button>
-                  </div>
+                  <ScrollArea className="h-60">
+                    <div className="p-2 grid grid-cols-2 gap-1">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{date}')}
+                      >
+                        {'{date}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{property.address}')}
+                      >
+                        {'{property.address}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.number}')}
+                      >
+                        {'{mortgage.number}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.balance}')}
+                      >
+                        {'{mortgage.balance}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.principal}')}
+                      >
+                        {'{mortgage.principal}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.per_diem}')}
+                      >
+                        {'{mortgage.per_diem}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.interest_rate}')}
+                      >
+                        {'{mortgage.interest_rate}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{case.file_number}')}
+                      >
+                        {'{case.file_number}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{lender.name}')}
+                      >
+                        {'{lender.name}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{borrower.name}')}
+                      >
+                        {'{borrower.name}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{borrower.email}')}
+                      >
+                        {'{borrower.email}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{borrower.phone}')}
+                      >
+                        {'{borrower.phone}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{court.file_number}')}
+                      >
+                        {'{court.file_number}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{court.registry}')}
+                      >
+                        {'{court.registry}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{court.hearing_date}')}
+                      >
+                        {'{court.hearing_date}'}
+                      </Button>
+                    </div>
+                  </ScrollArea>
                 </Card>
               </PopoverContent>
             </Popover>
           </div>
           
-          <div ref={editorContainerRef} className="relative overflow-auto" style={{ maxHeight: "500px" }}>
+          <ScrollArea className="h-[500px] relative">
             <div 
               ref={contentRef}
               className="min-h-[500px] p-4 border rounded-md focus:outline-none whitespace-pre-wrap" 
               contentEditable={true}
-              onInput={(e) => setContent((e.target as HTMLDivElement).innerHTML)}
+              onInput={(e) => {
+                setContent((e.target as HTMLDivElement).innerHTML);
+                e.stopPropagation();
+              }}
               dangerouslySetInnerHTML={{ __html: content }}
               style={{ fontFamily: currentFont }}
             />
-          </div>
+          </ScrollArea>
         </TabsContent>
         
         <TabsContent value="preview" className="border rounded-md p-4">
-          <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap overflow-auto" style={{ maxHeight: "500px" }}>
-            {previewContent ? (
-              <div style={{ fontFamily: currentFont }} dangerouslySetInnerHTML={{ __html: previewContent }} />
-            ) : (
-              <p className="text-muted-foreground">Preview will appear here...</p>
-            )}
-          </div>
+          <ScrollArea className="h-[500px]">
+            <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap">
+              {previewContent ? (
+                <div style={{ fontFamily: currentFont }} dangerouslySetInnerHTML={{ __html: previewContent }} />
+              ) : (
+                <p className="text-muted-foreground">Preview will appear here...</p>
+              )}
+            </div>
+          </ScrollArea>
         </TabsContent>
       </Tabs>
     </div>
