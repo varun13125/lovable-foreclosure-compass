@@ -69,7 +69,8 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
     if (selection && editorRef.current) {
       const sel = window.getSelection();
       if (sel && selection.node && editorRef.current.contains(selection.node)) {
-        const range = document.createRange();
+        // Fix: Use window.document instead of just document
+        const range = window.document.createRange();
         try {
           range.setStart(selection.node, selection.start);
           range.setEnd(selection.node, selection.end);
