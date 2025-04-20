@@ -37,8 +37,8 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
           updated_at,
           notes,
           court_file_number,
-          hearing_date,
           court_registry,
+          hearing_date,
           judge_name,
           property: properties (
             id,

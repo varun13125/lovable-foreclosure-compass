@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -69,30 +68,25 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
   
-  // Load templates from local storage
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
     if (savedTemplates) {
       const parsedTemplates = JSON.parse(savedTemplates);
       setTemplates(parsedTemplates);
       
-      // Auto-select template that matches document type
       const matchingTemplate = parsedTemplates.find((t: Template) => t.name === documentType);
       if (matchingTemplate) {
         setSelectedTemplate(matchingTemplate.id);
         setContent(matchingTemplate.content);
       } else {
         setSelectedTemplate(null);
-        // Set default content if no template is found
         setContent('<p>Enter your document content here...</p>');
       }
     } else {
-      // Set default content if no templates exist
       setContent('<p>Enter your document content here...</p>');
     }
   }, [documentType]);
   
-  // Load template content when template is selected
   useEffect(() => {
     if (selectedTemplate !== null) {
       const template = templates.find(t => t.id === selectedTemplate);
@@ -103,12 +97,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         }
       }
     } else if (templates.length > 0 && !content) {
-      // Set default content if no template is selected
       setContent('<p>Enter your document content here...</p>');
     }
   }, [selectedTemplate, templates, documentType]);
   
-  // Generate preview content with case variables replaced
   useEffect(() => {
     if (currentCase && content) {
       try {
@@ -123,7 +115,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [content, currentCase, activeTab]);
 
-  // Replace template variables with case data
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
@@ -147,7 +138,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       '{case.created_at}': format(new Date(caseData.createdAt), 'MMMM d, yyyy')
     };
 
-    // Add parties dynamically
     caseData.parties.forEach(party => {
       const type = party.type.toLowerCase();
       replacements[`{${type}.name}`] = party.name;
@@ -158,7 +148,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       }
     });
 
-    // Find lender/borrower if not found in specific types
     if (!replacements['{lender.name}']) {
       const lender = caseData.parties.find(p => 
         p.type.toLowerCase().includes('lender') || 
@@ -183,10 +172,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       }
     }
 
-    // Replace all variables in the template
     let result = template;
     for (const [key, value] of Object.entries(replacements)) {
-      // Use a regex with global flag to replace all occurrences
       const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
       result = result.replace(regex, value);
     }
@@ -215,18 +202,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     setIsGenerating(true);
 
     try {
-      // Get the final content with variables replaced
       const finalContent = replaceTemplateVariables(content, currentCase);
       
-      // Generate PDF from the content
       const doc = generateCaseDocument(currentCase, documentType, finalContent);
       const filename = `${documentTitle.replace(/\s+/g, '_')}.pdf`;
       
-      // Create PDF blob and file
       const pdfBlob = doc.output('blob');
       const file = new File([pdfBlob], filename, { type: 'application/pdf' });
       
-      // Upload to storage
       await uploadDocument(currentCase.id, file, filename, documentType);
       
       toast.success("Document saved successfully!");
@@ -276,13 +259,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
     
     try {
-      // Generate PDF
       const doc = generateCaseDocument(currentCase, documentType, previewContent);
       const filename = documentTitle ? 
         `${documentTitle.replace(/\s+/g, '_')}.pdf` : 
         `Case_${currentCase.fileNumber}_${documentType}.pdf`;
       
-      // Save the document
       doc.save(filename);
       toast.success("Document downloaded successfully!");
     } catch (error) {
@@ -292,25 +273,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   };
 
   const handleEmail = () => {
-    // Create mailto link with subject and body
     const subject = encodeURIComponent(documentTitle || documentType);
     const body = encodeURIComponent('Please see the attached document.');
     
-    // Open email client
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
     
     toast.info("Email client opened. Please attach the downloaded document manually.");
     
-    // Prompt to download the document first
     handleDownload();
   };
   
   const insertVariable = (variable: string) => {
     if (contentRef.current) {
-      // Get selection
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
-        // Insert the variable at cursor position
         const range = selection.getRangeAt(0);
         const span = document.createElement('span');
         span.className = 'bg-blue-100 rounded-md px-1 py-0.5 text-blue-800';
@@ -319,13 +295,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         range.deleteContents();
         range.insertNode(span);
         
-        // Move the cursor after the inserted variable
         range.setStartAfter(span);
         range.setEndAfter(span);
         selection.removeAllRanges();
         selection.addRange(range);
         
-        // Update content
         setContent(contentRef.current.innerHTML);
       }
     }
@@ -341,7 +315,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
 
   const handleSetFontSize = (size: string) => {
     setCurrentFontSize(size);
-    // Convert pt size to HTML font size (approximate)
     const fontSize = parseInt(size);
     let htmlSize;
     
@@ -354,15 +327,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     else htmlSize = '7';
     
     document.execCommand('fontSize', false, htmlSize);
-    
-    // Apply the exact size using style
-    const selection = document.getSelection();
-    if (selection && selection.rangeCount > 0 && selection.getRangeAt(0).commonAncestorContainer.parentNode) {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontSize = size;
-      range.surroundContents(span);
-    }
     
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);

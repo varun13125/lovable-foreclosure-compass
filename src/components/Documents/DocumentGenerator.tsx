@@ -29,7 +29,6 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
       <DocumentEditor 
         selectedCase={currentCase} 
         caseId={caseId} 
-        onError={(error) => toast.error(error)}
       />
     </div>
   );
