@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -64,16 +65,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('edit');
   const { currentCase } = useCase(selectedCase, caseId);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
   const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
-  const [editorHasFocus, setEditorHasFocus] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState<Range | null>(null);
-  const [lastScrollTop, setLastScrollTop] = useState(0);
-  const [previousSelection, setPreviousSelection] = useState<{start: number, end: number} | null>(null);
+  const [savedSelection, setSavedSelection] = useState<Range | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   
+  // Load templates and initial content
   useEffect(() => {
     const savedTemplates = localStorage.getItem('document_templates');
     if (savedTemplates) {
@@ -104,6 +103,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [documentType, currentCase]);
   
+  // Load template content when template changes
   useEffect(() => {
     if (selectedTemplate !== null) {
       const template = templates.find(t => t.id === selectedTemplate);
@@ -118,6 +118,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [selectedTemplate, templates]);
   
+  // Process template variables when content or case changes
   useEffect(() => {
     if (currentCase && content) {
       try {
@@ -132,35 +133,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   }, [content, currentCase, activeTab]);
   
+  // Setup editor event handlers
   useEffect(() => {
-    if (contentRef.current) {
-      const editorElement = contentRef.current;
+    if (editorRef.current) {
+      const editor = editorRef.current;
       
-      const handleEditorFocus = () => {
-        setEditorHasFocus(true);
-        
-        // Apply font settings to restore state
-        document.execCommand('fontName', false, currentFont);
-        applyFontSize(currentFontSize);
-        
-        // Restore cursor position if available
-        if (cursorPosition) {
-          const selection = window.getSelection();
-          if (selection) {
-            selection.removeAllRanges();
-            selection.addRange(cursorPosition);
-          }
-        }
+      const handleInput = () => {
+        setContent(editor.innerHTML);
+        saveSelection();
       };
       
-      const handleEditorBlur = () => {
-        setEditorHasFocus(false);
-        
-        // Save cursor position on blur
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          setCursorPosition(selection.getRangeAt(0).cloneRange());
+      const handleFocus = () => {
+        if (savedSelection) {
+          restoreSelection();
         }
+        
+        // Set default font and size
+        document.execCommand('fontName', false, currentFont);
+        document.execCommand('fontSize', false, currentFontSize);
+      };
+      
+      const handleBlur = () => {
+        saveSelection();
       };
       
       const handlePaste = (e: ClipboardEvent) => {
@@ -169,76 +163,54 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         document.execCommand('insertText', false, text);
       };
       
-      const handleKeyUp = (e: KeyboardEvent) => {
-        // Store current content
-        setContent(editorElement.innerHTML);
-        
-        // Save cursor position
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0).cloneRange();
-          setCursorPosition(range);
-          
-          // Prevent event bubbling
-          e.stopPropagation();
-        }
-      };
-      
+      // Prevent default handling that might cause scroll issues
       const handleKeyDown = (e: KeyboardEvent) => {
-        e.stopPropagation();
-      };
-      
-      const handleInput = (e: Event) => {
-        // Update content state
-        setContent(editorElement.innerHTML);
-        
-        // Maintain cursor position
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          setCursorPosition(selection.getRangeAt(0).cloneRange());
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          document.execCommand('insertText', false, '    ');
         }
         
+        // Don't let these events bubble up
         e.stopPropagation();
       };
       
-      // Prevent scroll reset on content change
-      const handleScroll = (e: Event) => {
-        const target = e.target as HTMLElement;
-        setLastScrollTop(target.scrollTop);
-      };
+      // Attach all event handlers
+      editor.addEventListener('input', handleInput);
+      editor.addEventListener('focus', handleFocus);
+      editor.addEventListener('blur', handleBlur);
+      editor.addEventListener('paste', handlePaste);
+      editor.addEventListener('keydown', handleKeyDown);
       
-      editorElement.addEventListener('focus', handleEditorFocus);
-      editorElement.addEventListener('blur', handleEditorBlur);
-      editorElement.addEventListener('paste', handlePaste);
-      editorElement.addEventListener('keyup', handleKeyUp);
-      editorElement.addEventListener('keydown', handleKeyDown);
-      editorElement.addEventListener('input', handleInput);
-      editorElement.addEventListener('scroll', handleScroll);
-      
-      // Initial focus if needed
-      if (editorHasFocus && document.activeElement !== editorElement) {
-        editorElement.focus();
-      }
-      
+      // Clean up
       return () => {
-        editorElement.removeEventListener('focus', handleEditorFocus);
-        editorElement.removeEventListener('blur', handleEditorBlur);
-        editorElement.removeEventListener('paste', handlePaste);
-        editorElement.removeEventListener('keyup', handleKeyUp);
-        editorElement.removeEventListener('keydown', handleKeyDown);
-        editorElement.removeEventListener('input', handleInput);
-        editorElement.removeEventListener('scroll', handleScroll);
+        editor.removeEventListener('input', handleInput);
+        editor.removeEventListener('focus', handleFocus);
+        editor.removeEventListener('blur', handleBlur);
+        editor.removeEventListener('paste', handlePaste);
+        editor.removeEventListener('keydown', handleKeyDown);
       };
     }
-  }, [contentRef.current, currentFont, currentFontSize, cursorPosition, editorHasFocus]);
+  }, [currentFont, currentFontSize, savedSelection]);
   
-  // Maintain scroll position after content changes
-  useEffect(() => {
-    if (contentRef.current && lastScrollTop > 0) {
-      contentRef.current.scrollTop = lastScrollTop;
+  // Save and restore selection to maintain cursor position
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
+      setSavedSelection(selection.getRangeAt(0).cloneRange());
     }
-  }, [content, lastScrollTop]);
+  };
+  
+  const restoreSelection = () => {
+    if (savedSelection && editorRef.current) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+      }
+    }
+  };
 
+  // Replace template variables with case data
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
@@ -312,57 +284,66 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     return result;
   };
 
+  // Format text in editor
   const handleTextFormatting = (command: string, value: string = '') => {
-    if (!contentRef.current) return;
+    if (!editorRef.current) return;
     
-    // Focus and run command
-    contentRef.current.focus();
+    // Focus editor
+    editorRef.current.focus();
+    
+    // Restore selection if needed
+    if (savedSelection) {
+      restoreSelection();
+    }
+    
+    // Execute command
     document.execCommand(command, false, value);
     
-    // Update content state
-    setContent(contentRef.current.innerHTML);
-    
-    // Save cursor position
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      setCursorPosition(selection.getRangeAt(0).cloneRange());
-    }
+    // Update state and save selection
+    setContent(editorRef.current.innerHTML);
+    saveSelection();
   };
   
+  // Apply font size to selected text
   const applyFontSize = (size: string) => {
+    setCurrentFontSize(size);
+    
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    
+    if (savedSelection) {
+      restoreSelection();
+    }
+    
+    const span = document.createElement('span');
+    span.style.fontSize = size;
+    
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || !contentRef.current) return;
-    
-    const range = selection.getRangeAt(0);
-    
-    if (range.collapsed) {
-      const span = document.createElement('span');
-      span.style.fontSize = size;
-      span.innerHTML = '&#8203;'; // Zero-width space
-      range.insertNode(span);
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
       
-      range.setStartAfter(span);
-      range.setEndAfter(span);
+      if (range.collapsed) {
+        // No text selected, just set for upcoming text
+        span.innerHTML = '&#8203;'; // Zero-width space
+        range.insertNode(span);
+        range.setStartAfter(span);
+        range.collapse(true);
+      } else {
+        // Wrap selected text
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+        range.selectNodeContents(span);
+      }
+      
       selection.removeAllRanges();
       selection.addRange(range);
-    } else {
-      const span = document.createElement('span');
-      span.style.fontSize = size;
-      range.surroundContents(span);
     }
     
-    if (contentRef.current) {
-      // Update content state
-      setContent(contentRef.current.innerHTML);
-      
-      // Save updated cursor position
-      const newSelection = window.getSelection();
-      if (newSelection && newSelection.rangeCount > 0) {
-        setCursorPosition(newSelection.getRangeAt(0).cloneRange());
-      }
-    }
+    setContent(editorRef.current.innerHTML);
+    saveSelection();
   };
 
+  // Save document
   const handleSaveDocument = async () => {
     if (!currentCase) {
       toast.error("No case selected. Please select a case to save a document.");
@@ -400,6 +381,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   };
 
+  // Print document
   const handlePrint = () => {
     if (!currentCase) {
       toast.error("No case selected. Please select a case for document generation.");
@@ -490,6 +472,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   };
 
+  // Download document
   const handleDownload = () => {
     if (!currentCase) {
       toast.error("No case selected.");
@@ -514,6 +497,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     }
   };
 
+  // Email document
   const handleEmail = () => {
     const subject = encodeURIComponent(documentTitle || documentType);
     const body = encodeURIComponent('Please see the attached document.');
@@ -525,63 +509,45 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     handleDownload();
   };
 
-  const insertVariable = (variable: string) => {
-    if (contentRef.current) {
-      contentRef.current.focus();
-      
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const span = document.createElement('span');
-        span.className = 'bg-blue-100 rounded-md px-1 py-0.5 text-blue-800';
-        span.contentEditable = 'false';
-        span.textContent = variable;
-        range.deleteContents();
-        range.insertNode(span);
-        
-        // Move cursor after variable
-        range.setStartAfter(span);
-        range.setEndAfter(span);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        // Add a space after variable
-        document.execCommand('insertText', false, ' ');
-        
-        // Update content state
-        setContent(contentRef.current.innerHTML);
-        
-        // Save cursor position
-        const newSelection = window.getSelection();
-        if (newSelection && newSelection.rangeCount > 0) {
-          setCursorPosition(newSelection.getRangeAt(0).cloneRange());
-        }
-      }
-    }
-  };
-
+  // Set font for editor
   const handleSetFont = (font: string) => {
     setCurrentFont(font);
-    
-    if (contentRef.current) {
-      contentRef.current.focus();
-      document.execCommand('fontName', false, font);
-      setContent(contentRef.current.innerHTML);
-      
-      // Save cursor position after font change
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        setCursorPosition(selection.getRangeAt(0).cloneRange());
-      }
-    }
+    handleTextFormatting('fontName', font);
   };
 
-  const handleSetFontSize = (size: string) => {
-    setCurrentFontSize(size);
+  // Insert variable into editor
+  const insertVariable = (variable: string) => {
+    if (!editorRef.current) return;
     
-    if (contentRef.current) {
-      contentRef.current.focus();
-      applyFontSize(size);
+    // Focus and restore selection
+    editorRef.current.focus();
+    if (savedSelection) {
+      restoreSelection();
+    }
+    
+    const span = document.createElement('span');
+    span.className = 'bg-blue-100 rounded-md px-1 py-0.5 text-blue-800';
+    span.contentEditable = 'false';
+    span.textContent = variable;
+    
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(span);
+      
+      // Move cursor after variable
+      range.setStartAfter(span);
+      range.setEndAfter(span);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      
+      // Add space after variable
+      document.execCommand('insertText', false, ' ');
+      
+      // Save cursor position and update content
+      saveSelection();
+      setContent(editorRef.current.innerHTML);
     }
   };
 
@@ -661,7 +627,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
                 </SelectContent>
               </Select>
               
-              <Select value={currentFontSize} onValueChange={handleSetFontSize}>
+              <Select value={currentFontSize} onValueChange={applyFontSize}>
                 <SelectTrigger className="w-16 h-8">
                   <SelectValue />
                 </SelectTrigger>
@@ -823,4 +789,65 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
                       <Button 
                         size="sm" 
                         variant="ghost" 
-                        className="justify-start text-
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{mortgage.arrears}')}
+                      >
+                        {'{mortgage.arrears}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{case.file_number}')}
+                      >
+                        {'{case.file_number}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{lender.name}')}
+                      >
+                        {'{lender.name}'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="justify-start text-left text-xs h-7"
+                        onClick={() => insertVariable('{borrower.name}')}
+                      >
+                        {'{borrower.name}'}
+                      </Button>
+                    </div>
+                  </ScrollArea>
+                </Card>
+              </PopoverContent>
+            </Popover>
+          </div>
+          
+          <ScrollArea className="h-[500px] w-full border rounded-md p-3">
+            <div
+              ref={editorRef}
+              className="min-h-full outline-none"
+              contentEditable
+              dangerouslySetInnerHTML={{ __html: content }}
+              style={{ fontFamily: currentFont }}
+            />
+          </ScrollArea>
+        </TabsContent>
+        
+        <TabsContent value="preview" className="border rounded-md">
+          <ScrollArea className="h-[600px] w-full p-6">
+            <div 
+              className="preview-content" 
+              style={{ fontFamily: currentFont }}
+              dangerouslySetInnerHTML={{ __html: previewContent }} 
+            />
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default DocumentEditor;
