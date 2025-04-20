@@ -237,11 +237,13 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
             <div className="p-6">
               {isEditing ? (
-                <RichTextEditor
-                  value={documentContent}
-                  onChange={setDocumentContent}
-                  minHeight="60vh"
-                />
+                <div className="edit-container" style={{ height: "60vh" }}>
+                  <RichTextEditor
+                    value={documentContent}
+                    onChange={setDocumentContent}
+                    minHeight="60vh"
+                  />
+                </div>
               ) : (
                 <div 
                   className="prose prose-sm max-w-none dark:prose-invert"
@@ -257,4 +259,3 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 };
 
 export default DocumentViewer;
-
