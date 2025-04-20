@@ -22,9 +22,8 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   onStatusChange
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [documentContent, setDocumentContent] = useState(content);
+  const [documentContent, setDocumentContent] = useState('');
   const [saving, setSaving] = useState(false);
-  const [formattedContent, setFormattedContent] = useState('');
   const editorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,24 +37,15 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           .map(para => `<p>${para}</p>`)
           .join('')}</div>`;
       }
-      setFormattedContent(formatted);
       setDocumentContent(formatted);
     }
   }, [content]);
 
-  const handleContentChange = (e: React.FormEvent<HTMLDivElement>) => {
+  const handleContentChange = () => {
     if (editorRef.current) {
       setDocumentContent(editorRef.current.innerHTML);
     }
   };
-
-  // Setup editor when editing mode changes
-  useEffect(() => {
-    if (isEditing && editorRef.current) {
-      // Focus the editor when editing starts
-      editorRef.current.focus();
-    }
-  }, [isEditing]);
 
   const handlePrint = () => {
     try {
@@ -210,7 +200,7 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 variant="outline" 
                 onClick={() => {
                   setIsEditing(false);
-                  setDocumentContent(formattedContent);
+                  setDocumentContent(content || '');
                 }}
                 disabled={saving}
               >
@@ -259,20 +249,18 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
       
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <ScrollArea className={`h-[70vh] w-full ${isEditing ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-900/20'}`}>
+          <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
             <div className="p-6">
               {isEditing ? (
                 <div
                   ref={editorRef}
                   contentEditable
-                  className="outline-none min-h-full prose prose-sm max-w-none dark:prose-invert"
+                  className="outline-none prose prose-sm max-w-none dark:prose-invert min-h-[60vh] p-4 bg-white dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700"
                   dangerouslySetInnerHTML={{ __html: documentContent }}
-                  suppressContentEditableWarning
                   onInput={handleContentChange}
                   style={{
                     fontFamily: "Arial, sans-serif",
-                    lineHeight: 1.5,
-                    minHeight: "60vh"
+                    lineHeight: 1.5
                   }}
                 />
               ) : (
