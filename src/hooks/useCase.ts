@@ -5,19 +5,23 @@ import { Case } from '@/types';
 
 export const useCase = (initialCase: Case | null, caseId?: string) => {
   const [currentCase, setCurrentCase] = useState<Case | null>(initialCase);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(initialCase ? false : true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialCase) {
       console.log("Using provided case data:", initialCase.fileNumber);
       setCurrentCase(initialCase);
+      setLoading(false);
+      setError(null);
     } else if (caseId) {
       console.log("Fetching case by ID:", caseId);
       fetchCaseById(caseId);
     } else {
       console.log("No case data or ID provided");
       setCurrentCase(null);
+      setLoading(false);
+      setError(null);
     }
   }, [initialCase, caseId]);
 
@@ -73,7 +77,10 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error from Supabase:", error);
+        throw error;
+      }
 
       if (data) {
         console.log("Case data fetched successfully:", data.file_number);
@@ -84,19 +91,25 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
           status: data.status,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
-          property: {
-            id: data.property?.id,
+          property: data.property ? {
+            id: data.property.id,
             address: {
-              street: data.property?.street || "",
-              city: data.property?.city || "",
-              province: data.property?.province || "",
-              postalCode: data.property?.postal_code || "",
+              street: data.property.street || "",
+              city: data.property.city || "",
+              province: data.property.province || "",
+              postalCode: data.property.postal_code || "",
             },
-            pid: data.property?.pid || "",
-            legal_description: data.property?.legal_description || "",
-            propertyType: data.property?.property_type || "Residential"
+            pid: data.property.pid || "",
+            legal_description: data.property.legal_description || "",
+            propertyType: data.property.property_type || "Residential"
+          } : {
+            id: '',
+            address: { street: '', city: '', province: '', postalCode: '' },
+            pid: '',
+            legal_description: '',
+            propertyType: 'Residential'
           },
-          parties: data.parties.map(cp => ({
+          parties: data.parties ? data.parties.map((cp: any) => ({
             id: cp.party.id,
             name: cp.party.name,
             type: cp.party.type,
@@ -105,15 +118,23 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
               phone: cp.party.phone || '',
               address: cp.party.address || ''
             }
-          })),
-          mortgage: {
-            id: data.mortgage?.id,
-            registrationNumber: data.mortgage?.registration_number,
-            principal: data.mortgage?.principal,
-            interestRate: data.mortgage?.interest_rate,
-            startDate: data.mortgage?.start_date,
-            currentBalance: data.mortgage?.current_balance,
-            perDiemInterest: data.mortgage?.per_diem_interest || 0
+          })) : [],
+          mortgage: data.mortgage ? {
+            id: data.mortgage.id,
+            registrationNumber: data.mortgage.registration_number || '',
+            principal: data.mortgage.principal || 0,
+            interestRate: data.mortgage.interest_rate || 0,
+            startDate: data.mortgage.start_date || '',
+            currentBalance: data.mortgage.current_balance || 0,
+            perDiemInterest: data.mortgage.per_diem_interest || 0
+          } : {
+            id: '',
+            registrationNumber: '',
+            principal: 0,
+            interestRate: 0,
+            startDate: '',
+            currentBalance: 0,
+            perDiemInterest: 0
           },
           deadlines: [],
           documents: [],
@@ -122,17 +143,19 @@ export const useCase = (initialCase: Case | null, caseId?: string) => {
             registry: data.court_registry || '',
             hearingDate: data.hearing_date || null,
             judgeName: data.judge_name || ''
-          }
+          },
+          notes: data.notes || ''
         };
         console.log("Transformed case data:", transformedCase.fileNumber);
         setCurrentCase(transformedCase);
       } else {
         console.log("No case data found for ID:", id);
         setCurrentCase(null);
+        setError("Case not found");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching case:", error);
-      setError("Failed to fetch case data");
+      setError(error.message || "Failed to fetch case data");
       setCurrentCase(null);
     } finally {
       setLoading(false);

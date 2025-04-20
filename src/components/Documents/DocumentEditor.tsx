@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -85,14 +86,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     } else {
       setContent('<p>Enter your document content here...</p>');
     }
-  }, [documentType]);
+    
+    // Set default document title
+    if (!documentTitle && currentCase) {
+      setDocumentTitle(`${documentType} - ${currentCase.fileNumber} - ${format(new Date(), 'yyyy-MM-dd')}`);
+    } else if (!documentTitle) {
+      setDocumentTitle(`${documentType} - ${format(new Date(), 'yyyy-MM-dd')}`);
+    }
+  }, [documentType, currentCase]);
   
   useEffect(() => {
     if (selectedTemplate !== null) {
       const template = templates.find(t => t.id === selectedTemplate);
       if (template) {
         setContent(template.content);
-        if (!documentTitle) {
+        if (!documentTitle && currentCase) {
+          setDocumentTitle(`${documentType} - ${currentCase.fileNumber} - ${format(new Date(), 'yyyy-MM-dd')}`);
+        } else if (!documentTitle) {
           setDocumentTitle(`${documentType} - ${format(new Date(), 'yyyy-MM-dd')}`);
         }
       }
@@ -114,67 +124,120 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       setPreviewContent(content);
     }
   }, [content, currentCase, activeTab]);
+  
+  // Add focus and setup event listeners
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.focus();
+      
+      // Ensure contenteditable properly retains focus
+      const handleFocus = () => {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        
+        // Place cursor at the end of the content
+        if (contentRef.current) {
+          range.selectNodeContents(contentRef.current);
+          range.collapse(false); // collapse to end
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          
+          // Apply current font and size
+          document.execCommand('fontName', false, currentFont);
+          applyFontSize(currentFontSize);
+        }
+      };
+      
+      contentRef.current.addEventListener('focus', handleFocus);
+      
+      // Fix paste functionality to strip unwanted formatting
+      contentRef.current.addEventListener('paste', (e) => {
+        e.preventDefault();
+        
+        // Get plain text from clipboard
+        const text = e.clipboardData?.getData('text/plain');
+        
+        if (text) {
+          // Insert text at cursor position
+          document.execCommand('insertText', false, text);
+        }
+      });
+      
+      return () => {
+        if (contentRef.current) {
+          contentRef.current.removeEventListener('focus', handleFocus);
+        }
+      };
+    }
+  }, [contentRef.current, currentFont, currentFontSize]);
 
   const replaceTemplateVariables = (template: string, caseData: Case): string => {
     if (!caseData) return template;
     
     const replacements: Record<string, string> = {
       '{date}': format(new Date(), 'MMMM d, yyyy'),
-      '{property.address}': `${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province} ${caseData.property.address.postalCode}`,
-      '{mortgage.number}': caseData.mortgage.registrationNumber,
-      '{mortgage.balance}': caseData.mortgage.currentBalance.toLocaleString(),
-      '{mortgage.principal}': caseData.mortgage.principal.toLocaleString(),
-      '{mortgage.per_diem}': caseData.mortgage.perDiemInterest.toFixed(2),
-      '{mortgage.interest_rate}': `${caseData.mortgage.interestRate}%`,
-      '{mortgage.arrears}': caseData.mortgage.arrears?.toLocaleString() || 'N/A',
+      '{property.address}': caseData.property ? `${caseData.property.address.street}, ${caseData.property.address.city}, ${caseData.property.address.province} ${caseData.property.address.postalCode}` : 'N/A',
+      '{mortgage.number}': caseData.mortgage?.registrationNumber || 'N/A',
+      '{mortgage.balance}': (caseData.mortgage?.currentBalance || 0).toLocaleString(),
+      '{mortgage.principal}': (caseData.mortgage?.principal || 0).toLocaleString(),
+      '{mortgage.per_diem}': (caseData.mortgage?.perDiemInterest || 0).toFixed(2),
+      '{mortgage.interest_rate}': `${caseData.mortgage?.interestRate || 0}%`,
+      '{mortgage.arrears}': caseData.mortgage?.arrears?.toLocaleString() || 'N/A',
       '{court.file_number}': caseData.court?.fileNumber || 'N/A',
       '{court.registry}': caseData.court?.registry || 'N/A',
       '{court.hearing_date}': caseData.court?.hearingDate 
         ? format(new Date(caseData.court.hearingDate), 'MMMM d, yyyy') 
         : 'N/A',
       '{court.judge_name}': caseData.court?.judgeName || 'N/A',
-      '{case.file_number}': caseData.fileNumber,
-      '{case.status}': caseData.status,
-      '{case.created_at}': format(new Date(caseData.createdAt), 'MMMM d, yyyy')
+      '{case.file_number}': caseData.fileNumber || 'N/A',
+      '{case.status}': caseData.status || 'N/A',
+      '{case.created_at}': caseData.createdAt ? format(new Date(caseData.createdAt), 'MMMM d, yyyy') : 'N/A'
     };
 
-    caseData.parties.forEach(party => {
-      const type = party.type.toLowerCase();
-      replacements[`{${type}.name}`] = party.name;
-      replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
-      replacements[`{${type}.phone}`] = party.contactInfo.phone || 'N/A';
-      if (party.contactInfo.address) {
-        replacements[`{${type}.address}`] = party.contactInfo.address;
-      }
-    });
+    if (caseData.parties && Array.isArray(caseData.parties)) {
+      caseData.parties.forEach(party => {
+        if (!party || !party.type) return;
+        
+        const type = party.type.toLowerCase();
+        replacements[`{${type}.name}`] = party.name || 'N/A';
+        if (party.contactInfo) {
+          replacements[`{${type}.email}`] = party.contactInfo.email || 'N/A';
+          replacements[`{${type}.phone}`] = party.contactInfo.phone || 'N/A';
+          if (party.contactInfo.address) {
+            replacements[`{${type}.address}`] = party.contactInfo.address;
+          }
+        }
+      });
+    }
 
     if (!replacements['{lender.name}']) {
-      const lender = caseData.parties.find(p => 
+      const lender = caseData.parties?.find(p => 
         p.type.toLowerCase().includes('lender') || 
         p.type.toLowerCase().includes('mortgagee')
       );
       if (lender) {
-        replacements['{lender.name}'] = lender.name;
-        replacements['{lender.email}'] = lender.contactInfo.email || 'N/A';
-        replacements['{lender.phone}'] = lender.contactInfo.phone || 'N/A';
+        replacements['{lender.name}'] = lender.name || 'N/A';
+        replacements['{lender.email}'] = lender.contactInfo?.email || 'N/A';
+        replacements['{lender.phone}'] = lender.contactInfo?.phone || 'N/A';
       }
     }
     
     if (!replacements['{borrower.name}']) {
-      const borrower = caseData.parties.find(p => 
+      const borrower = caseData.parties?.find(p => 
         p.type.toLowerCase().includes('borrower') || 
         p.type.toLowerCase().includes('mortgagor')
       );
       if (borrower) {
-        replacements['{borrower.name}'] = borrower.name;
-        replacements['{borrower.email}'] = borrower.contactInfo.email || 'N/A';
-        replacements['{borrower.phone}'] = borrower.contactInfo.phone || 'N/A';
+        replacements['{borrower.name}'] = borrower.name || 'N/A';
+        replacements['{borrower.email}'] = borrower.contactInfo?.email || 'N/A';
+        replacements['{borrower.phone}'] = borrower.contactInfo?.phone || 'N/A';
       }
     }
 
     let result = template;
     for (const [key, value] of Object.entries(replacements)) {
-      const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedKey, 'g');
       result = result.replace(regex, value);
     }
     
@@ -182,7 +245,65 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   };
 
   const handleTextFormatting = (command: string, value: string = '') => {
+    if (!contentRef.current) return;
+    
+    // Focus the editable div first
+    contentRef.current.focus();
+    
+    // Save selection
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    // Apply command
     document.execCommand(command, false, value);
+    
+    // Update content state
+    setContent(contentRef.current.innerHTML);
+    
+    // Set focus back to the editor
+    contentRef.current.focus();
+  };
+  
+  const applyFontSize = (size: string) => {
+    const fontSize = parseInt(size);
+    let htmlSize;
+    
+    // Map font sizes to HTML size values (approximate)
+    if (fontSize <= 9) htmlSize = '1';
+    else if (fontSize <= 11) htmlSize = '2';
+    else if (fontSize <= 14) htmlSize = '3';
+    else if (fontSize <= 18) htmlSize = '4';
+    else if (fontSize <= 24) htmlSize = '5';
+    else if (fontSize <= 36) htmlSize = '6';
+    else htmlSize = '7';
+    
+    document.execCommand('fontSize', false, htmlSize);
+    
+    // Also apply inline style for more precise sizing
+    if (contentRef.current && window.getSelection) {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+        span.style.fontSize = size;
+        
+        // If there's selected text, wrap it in the span
+        if (!range.collapsed) {
+          range.surroundContents(span);
+        } else {
+          // For cursor position, insert a character and apply style
+          span.innerHTML = '&#8203;'; // Zero-width space
+          range.insertNode(span);
+          
+          // Move cursor after the span
+          range.setStartAfter(span);
+          range.setEndAfter(span);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+    
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);
     }
@@ -205,6 +326,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
       const finalContent = replaceTemplateVariables(content, currentCase);
       
       const doc = generateCaseDocument(currentCase, documentType, finalContent);
+      if (!doc) {
+        throw new Error("Failed to generate document");
+      }
+      
       const filename = `${documentTitle.replace(/\s+/g, '_')}.pdf`;
       
       const pdfBlob = doc.output('blob');
@@ -222,33 +347,92 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>${documentTitle || documentType}</title>
-            <style>
-              @media print {
-                body { font-family: ${currentFont}; line-height: 1.6; margin: 20px; }
-                h1, h2, h3 { margin-top: 20px; }
-                button { display: none !important; }
-              }
-            </style>
-          </head>
-          <body>
-            <div>
-              ${previewContent}
-            </div>
-            <script>
-              setTimeout(() => window.print(), 500);
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    } else {
-      toast.error("Unable to open print window. Please check your popup settings.");
+    if (!currentCase) {
+      toast.error("No case selected. Please select a case for document generation.");
+      return;
+    }
+    
+    try {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${documentTitle || documentType}</title>
+              <style>
+                @media print {
+                  body { 
+                    font-family: ${currentFont}; 
+                    line-height: 1.6; 
+                    margin: 20px;
+                    color: #000;
+                  }
+                  h1, h2, h3 { margin-top: 20px; margin-bottom: 10px; }
+                  p { margin-bottom: 10px; }
+                  button { display: none !important; }
+                  @page { margin: 2cm; }
+                }
+                body { 
+                  font-family: ${currentFont}; 
+                  line-height: 1.6; 
+                  margin: 20px;
+                  padding: 20px;
+                }
+                .document-header {
+                  text-align: center;
+                  margin-bottom: 30px;
+                }
+                .document-title {
+                  font-size: 24px;
+                  font-weight: bold;
+                }
+                .document-date {
+                  color: #666;
+                  margin-top: 5px;
+                  font-size: 14px;
+                }
+                .print-button {
+                  position: fixed;
+                  top: 20px;
+                  right: 20px;
+                  background: #0077cc;
+                  color: white;
+                  border: none;
+                  padding: 8px 16px;
+                  border-radius: 4px;
+                  cursor: pointer;
+                }
+                .print-button:hover {
+                  background: #0066b3;
+                }
+                @media print {
+                  .print-button {
+                    display: none;
+                  }
+                }
+              </style>
+            </head>
+            <body>
+              <button class="print-button" onclick="window.print()">Print Document</button>
+              
+              <div class="document-header">
+                <div class="document-title">${documentTitle || documentType}</div>
+                <div class="document-date">Generated: ${format(new Date(), 'MMMM d, yyyy')}</div>
+              </div>
+              
+              <div>
+                ${previewContent}
+              </div>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      } else {
+        toast.error("Unable to open print window. Please check your popup settings.");
+      }
+    } catch (error) {
+      console.error("Error preparing print view:", error);
+      toast.error("Failed to prepare document for printing.");
     }
   };
 
@@ -260,6 +444,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     
     try {
       const doc = generateCaseDocument(currentCase, documentType, previewContent);
+      if (!doc) {
+        throw new Error("Failed to generate document");
+      }
+      
       const filename = documentTitle ? 
         `${documentTitle.replace(/\s+/g, '_')}.pdf` : 
         `Case_${currentCase.fileNumber}_${documentType}.pdf`;
@@ -285,6 +473,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   
   const insertVariable = (variable: string) => {
     if (contentRef.current) {
+      contentRef.current.focus();
+      
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
@@ -295,11 +485,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         range.deleteContents();
         range.insertNode(span);
         
+        // Move cursor after the inserted variable
         range.setStartAfter(span);
         range.setEndAfter(span);
         selection.removeAllRanges();
         selection.addRange(range);
         
+        // Insert a space after the variable for better editing
+        document.execCommand('insertText', false, ' ');
+        
+        // Update content state
         setContent(contentRef.current.innerHTML);
       }
     }
@@ -307,29 +502,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
 
   const handleSetFont = (font: string) => {
     setCurrentFont(font);
-    document.execCommand('fontName', false, font);
+    
     if (contentRef.current) {
+      contentRef.current.focus();
+      document.execCommand('fontName', false, font);
       setContent(contentRef.current.innerHTML);
     }
   };
 
   const handleSetFontSize = (size: string) => {
     setCurrentFontSize(size);
-    const fontSize = parseInt(size);
-    let htmlSize;
-    
-    if (fontSize <= 9) htmlSize = '1';
-    else if (fontSize <= 11) htmlSize = '2';
-    else if (fontSize <= 14) htmlSize = '3';
-    else if (fontSize <= 18) htmlSize = '4';
-    else if (fontSize <= 24) htmlSize = '5';
-    else if (fontSize <= 36) htmlSize = '6';
-    else htmlSize = '7';
-    
-    document.execCommand('fontSize', false, htmlSize);
     
     if (contentRef.current) {
-      setContent(contentRef.current.innerHTML);
+      contentRef.current.focus();
+      applyFontSize(size);
     }
   };
 
@@ -348,14 +534,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
             
             <Select 
-              value={selectedTemplate !== null ? selectedTemplate.toString() : "no_template"} 
-              onValueChange={(value) => setSelectedTemplate(value !== "no_template" ? parseInt(value) : null)}
+              value={selectedTemplate !== null ? selectedTemplate.toString() : ""} 
+              onValueChange={(value) => setSelectedTemplate(value !== "" ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select a template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="no_template">No Template</SelectItem>
+                <SelectItem value="">No Template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}
@@ -473,16 +659,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h1')}>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h1>')}>
                     <Heading1 className="h-3.5 w-3.5 mr-2" /> Heading 1
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h2')}>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h2>')}>
                     <Heading2 className="h-3.5 w-3.5 mr-2" /> Heading 2
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h3')}>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<h3>')}>
                     <Heading3 className="h-3.5 w-3.5 mr-2" /> Heading 3
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'p')}>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', '<p>')}>
                     <Type className="h-3.5 w-3.5 mr-2" /> Paragraph
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -657,7 +843,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         <TabsContent value="preview" className="border rounded-md p-4">
           <div className="min-h-[500px] p-4 border rounded-md whitespace-pre-wrap">
             {previewContent ? (
-              <div dangerouslySetInnerHTML={{ __html: previewContent }} />
+              <div style={{ fontFamily: currentFont }} dangerouslySetInnerHTML={{ __html: previewContent }} />
             ) : (
               <p className="text-muted-foreground">Preview will appear here...</p>
             )}

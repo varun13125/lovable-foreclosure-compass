@@ -1,4 +1,3 @@
-
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Case, DocumentType } from '@/types';
@@ -22,13 +21,14 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
   
   const replacements: Record<string, string> = {
     '{date}': format(new Date(), 'MMMM d, yyyy'),
-    '{property.address}': `${currentCase.property.address.street}, ${currentCase.property.address.city}, ${currentCase.property.address.province} ${currentCase.property.address.postalCode}`,
-    '{mortgage.number}': currentCase.mortgage.registrationNumber || 'N/A',
-    '{mortgage.balance}': (currentCase.mortgage.currentBalance || 0).toLocaleString(),
-    '{mortgage.principal}': (currentCase.mortgage.principal || 0).toLocaleString(),
-    '{mortgage.per_diem}': (currentCase.mortgage.perDiemInterest || 0).toFixed(2),
-    '{mortgage.interest_rate}': `${currentCase.mortgage.interestRate || 0}%`,
-    '{mortgage.arrears}': currentCase.mortgage.arrears?.toLocaleString() || 'N/A',
+    '{property.address}': currentCase.property ? 
+      `${currentCase.property.address.street}, ${currentCase.property.address.city}, ${currentCase.property.address.province} ${currentCase.property.address.postalCode}` : 'N/A',
+    '{mortgage.number}': currentCase.mortgage?.registrationNumber || 'N/A',
+    '{mortgage.balance}': (currentCase.mortgage?.currentBalance || 0).toLocaleString(),
+    '{mortgage.principal}': (currentCase.mortgage?.principal || 0).toLocaleString(),
+    '{mortgage.per_diem}': (currentCase.mortgage?.perDiemInterest || 0).toFixed(2),
+    '{mortgage.interest_rate}': `${currentCase.mortgage?.interestRate || 0}%`,
+    '{mortgage.arrears}': currentCase.mortgage?.arrears?.toLocaleString() || 'N/A',
     '{court.file_number}': currentCase.court?.fileNumber || 'N/A',
     '{court.registry}': currentCase.court?.registry || 'N/A',
     '{court.hearing_date}': currentCase.court?.hearingDate 
@@ -96,46 +96,114 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
   return result;
 };
 
-// Helper function to clean HTML to plain text
-const cleanHtmlContent = (html: string): string => {
+// Enhanced HTML parsing to retain formatting
+const cleanHtmlContent = (html: string): { text: string, formatting: any[] } => {
   // Create a temporary div to render the HTML
   const temp = document.createElement('div');
   temp.innerHTML = html;
   
-  // Preserve line breaks and formatting
-  const processNode = (node: Node): string => {
+  // Store formatting information
+  const formatting: any[] = [];
+  
+  // Process a node and extract formatting
+  const processNode = (node: Node, currentPos: number = 0, parentFormatting: any = {}): { text: string, position: number } => {
     if (node.nodeType === 3) { // Text node
-      return node.textContent || '';
+      const text = node.textContent || '';
+      if (text.trim()) {
+        // Add formatting info for this text segment if there's parent formatting
+        if (Object.keys(parentFormatting).length > 0) {
+          formatting.push({
+            start: currentPos,
+            end: currentPos + text.length,
+            ...parentFormatting
+          });
+        }
+      }
+      return { text, position: currentPos + text.length };
     }
     
     if (node.nodeType === 1) { // Element node
       const el = node as HTMLElement;
+      const nodeFormatting = { ...parentFormatting };
       
-      // Handle specific tags
-      if (el.tagName === 'BR') return '\n';
-      if (el.tagName === 'P') return processChildren(el) + '\n\n';
-      if (el.tagName === 'DIV') return processChildren(el) + '\n';
-      if (el.tagName === 'H1') return processChildren(el).toUpperCase() + '\n\n';
-      if (el.tagName === 'H2' || el.tagName === 'H3') return processChildren(el) + '\n\n';
-      if (el.tagName === 'B' || el.tagName === 'STRONG') return processChildren(el);
-      if (el.tagName === 'I' || el.tagName === 'EM') return processChildren(el);
-      if (el.tagName === 'U') return processChildren(el);
-      if (el.tagName === 'LI') return '• ' + processChildren(el) + '\n';
-      if (el.tagName === 'UL' || el.tagName === 'OL') return processChildren(el) + '\n';
+      // Handle specific elements and their formatting
+      if (el.tagName === 'B' || el.tagName === 'STRONG') nodeFormatting.bold = true;
+      if (el.tagName === 'I' || el.tagName === 'EM') nodeFormatting.italic = true;
+      if (el.tagName === 'U') nodeFormatting.underline = true;
       
-      // For other elements, just process children
-      return processChildren(el);
+      // Get font or size information
+      const fontFamily = el.style.fontFamily;
+      if (fontFamily) nodeFormatting.font = fontFamily;
+      
+      const fontSize = el.style.fontSize;
+      if (fontSize) nodeFormatting.size = fontSize;
+      
+      // Get alignment
+      const textAlign = el.style.textAlign;
+      if (textAlign) nodeFormatting.align = textAlign;
+      
+      // Process color
+      const color = el.style.color;
+      if (color) nodeFormatting.color = color;
+      
+      // Compute line breaks and formatting for special elements
+      let prefix = '';
+      let suffix = '';
+      
+      if (el.tagName === 'BR') return { text: '\n', position: currentPos + 1 };
+      if (el.tagName === 'P' && currentPos > 0) prefix = '\n\n';
+      if (el.tagName === 'DIV' && currentPos > 0) prefix = '\n';
+      if (el.tagName === 'H1') {
+        prefix = currentPos > 0 ? '\n\n' : '';
+        suffix = '\n';
+        nodeFormatting.size = '24pt';
+        nodeFormatting.bold = true;
+      }
+      if (el.tagName === 'H2') {
+        prefix = currentPos > 0 ? '\n\n' : '';
+        suffix = '\n';
+        nodeFormatting.size = '20pt';
+        nodeFormatting.bold = true;
+      }
+      if (el.tagName === 'H3') {
+        prefix = currentPos > 0 ? '\n\n' : '';
+        suffix = '\n';
+        nodeFormatting.size = '16pt';
+        nodeFormatting.bold = true;
+      }
+      if (el.tagName === 'LI') {
+        prefix = '• ';
+        suffix = '\n';
+      }
+      if (el.tagName === 'UL' || el.tagName === 'OL') {
+        suffix = '\n';
+      }
+      
+      // Process children with accumulated formatting
+      let text = prefix;
+      let position = currentPos + prefix.length;
+      
+      for (const child of Array.from(el.childNodes)) {
+        const result = processNode(child, position, nodeFormatting);
+        text += result.text;
+        position = result.position;
+      }
+      
+      text += suffix;
+      position += suffix.length;
+      
+      return { text, position };
     }
     
-    return '';
+    return { text: '', position: currentPos };
   };
   
-  const processChildren = (element: Node): string => {
-    return Array.from(element.childNodes).map(processNode).join('');
-  };
+  const result = processNode(temp);
   
-  // Process the entire document
-  return processNode(temp).trim();
+  return { 
+    text: result.text.trim(), 
+    formatting: formatting
+  };
 };
 
 export const generateCaseDocument = (currentCase: Case, documentType: string, template?: string) => {
@@ -163,44 +231,98 @@ export const generateCaseDocument = (currentCase: Case, documentType: string, te
     // Add date
     doc.setFontSize(10);
     doc.text(`Generated: ${format(new Date(), 'MMMM d, yyyy')}`, 195, 30, { align: 'right' });
+    
+    // Convert HTML content to text, preserving formatting
+    const { text, formatting } = cleanHtmlContent(processedTemplate);
+    const lines = text.split('\n');
+    
+    let yPos = 40;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     
-    // Convert HTML content to text, preserving structure as much as possible
-    const cleanContent = cleanHtmlContent(processedTemplate);
-    const lines = cleanContent.split('\n');
+    // Track paragraph positions for formatting
+    let currentTextPos = 0;
     
-    let yPos = 40;
-    
-    // Process each line
-    lines.forEach(line => {
+    // Process each line with formatting
+    lines.forEach((line, lineIndex) => {
       if (line.trim().length === 0) {
         yPos += 6; // Empty line spacing
+        currentTextPos += 1; // Account for the newline
         return;
       }
       
-      // Check if line is all caps (likely a header)
-      if (line === line.toUpperCase() && line.trim().length > 3) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text(line, 20, yPos);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'normal');
-        yPos += 8;
-      } else {
-        // Split long lines to fit on the page
-        const splitText = doc.splitTextToSize(line, 170);
-        splitText.forEach((textLine: string) => {
-          doc.text(textLine, 20, yPos);
-          yPos += 7;
-        });
-      }
-      
-      // Add new page if needed
+      // Check if we need a new page
       if (yPos > 270) {
         doc.addPage();
         yPos = 20;
       }
+      
+      // Split long lines to fit on the page
+      const maxWidth = 170;
+      const splitText = doc.splitTextToSize(line, maxWidth);
+      
+      // Apply formatting to each text segment
+      splitText.forEach((textLine: string) => {
+        // Find applicable formatting for this text position
+        const lineFormatting = formatting.filter(f => 
+          currentTextPos >= f.start && currentTextPos < f.end
+        );
+        
+        // Apply formatting
+        if (lineFormatting.length > 0) {
+          const format = lineFormatting[0];
+          
+          // Set font style based on formatting
+          let fontStyle = 'normal';
+          if (format.bold && format.italic) fontStyle = 'bolditalic';
+          else if (format.bold) fontStyle = 'bold';
+          else if (format.italic) fontStyle = 'italic';
+          
+          doc.setFont('helvetica', fontStyle);
+          
+          // Set font size if specified
+          if (format.size) {
+            const size = parseInt(format.size);
+            if (!isNaN(size)) {
+              doc.setFontSize(size);
+            }
+          }
+          
+          // Set color if specified
+          if (format.color) {
+            doc.setTextColor(format.color);
+          } else {
+            doc.setTextColor(0, 0, 0); // Default black
+          }
+        } else {
+          // Reset to default formatting
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(12);
+          doc.setTextColor(0, 0, 0);
+        }
+        
+        // Text alignment
+        const textAlign = lineFormatting.length > 0 && lineFormatting[0].align 
+          ? lineFormatting[0].align : 'left';
+        
+        let xPos = 20;
+        const alignment: any = { align: 'left' };
+        
+        if (textAlign === 'center') {
+          xPos = 105;
+          alignment.align = 'center';
+        } else if (textAlign === 'right') {
+          xPos = 190;
+          alignment.align = 'right';
+        }
+        
+        // Render text with formatting
+        doc.text(textLine, xPos, yPos, alignment);
+        yPos += 7;
+        
+        // Update current position in text
+        currentTextPos += textLine.length + 1; // +1 for the newline
+      });
     });
     
     return doc;
