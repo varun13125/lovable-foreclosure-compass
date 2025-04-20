@@ -101,14 +101,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({ selectedCase, cas
         <div>
           <label className="block text-sm font-medium mb-2">Template</label>
           <Select 
-            value={selectedTemplate?.toString() || ""} 
+            value={selectedTemplate?.toString() || undefined} 
             onValueChange={(value) => setSelectedTemplate(value ? parseInt(value) : null)}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a template" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Default Template</SelectItem>
+              <SelectItem value="default">Default Template</SelectItem>
               {templates.map((template) => (
                 <SelectItem key={template.id} value={template.id.toString()}>
                   {template.name}
