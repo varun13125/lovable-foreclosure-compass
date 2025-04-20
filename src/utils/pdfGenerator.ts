@@ -1,4 +1,3 @@
-
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Case, DocumentType } from '@/types';
@@ -69,13 +68,58 @@ const replaceTemplateVariables = (template: string, currentCase: Case): string =
     }
   }
 
-  // Replace all variables in the template
+  // Replace all variables in the template with regex to catch all occurrences
   let result = template;
   for (const [key, value] of Object.entries(replacements)) {
-    result = result.split(key).join(value);
+    // Escape special characters in the key for regex
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedKey, 'g');
+    result = result.replace(regex, value);
   }
   
   return result;
+};
+
+// Helper function to clean HTML to plain text
+const cleanHtmlContent = (html: string): string => {
+  // Create a temporary div to render the HTML
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  
+  // Preserve line breaks and formatting
+  const processNode = (node: Node): string => {
+    if (node.nodeType === 3) { // Text node
+      return node.textContent || '';
+    }
+    
+    if (node.nodeType === 1) { // Element node
+      const el = node as HTMLElement;
+      
+      // Handle specific tags
+      if (el.tagName === 'BR') return '\n';
+      if (el.tagName === 'P') return processChildren(el) + '\n\n';
+      if (el.tagName === 'DIV') return processChildren(el) + '\n';
+      if (el.tagName === 'H1') return processChildren(el).toUpperCase() + '\n\n';
+      if (el.tagName === 'H2' || el.tagName === 'H3') return processChildren(el) + '\n\n';
+      if (el.tagName === 'B' || el.tagName === 'STRONG') return processChildren(el);
+      if (el.tagName === 'I' || el.tagName === 'EM') return processChildren(el);
+      if (el.tagName === 'U') return processChildren(el);
+      if (el.tagName === 'LI') return '• ' + processChildren(el) + '\n';
+      if (el.tagName === 'UL' || el.tagName === 'OL') return processChildren(el) + '\n';
+      
+      // For other elements, just process children
+      return processChildren(el);
+    }
+    
+    return '';
+  };
+  
+  const processChildren = (element: Node): string => {
+    return Array.from(element.childNodes).map(processNode).join('');
+  };
+  
+  // Process the entire document
+  return processNode(temp).trim();
 };
 
 export const generateCaseDocument = (currentCase: Case, documentType: string, template?: string) => {
@@ -83,44 +127,50 @@ export const generateCaseDocument = (currentCase: Case, documentType: string, te
   
   if (template) {
     // Process template-based document
-    const processedContent = replaceTemplateVariables(template, currentCase);
-    const lines = processedContent.split('\n');
-    
-    let yPos = 20;
+    // Set default font
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(12);
     
     // Add document header
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${documentType}`, 105, yPos, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    yPos += 15;
+    doc.text(`${documentType}`, 105, 20, { align: 'center' });
     
     // Add date
     doc.setFontSize(10);
-    doc.text(`Generated: ${format(new Date(), 'MMMM d, yyyy')}`, 195, yPos, { align: 'right' });
-    yPos += 15;
-    
+    doc.text(`Generated: ${format(new Date(), 'MMMM d, yyyy')}`, 195, 30, { align: 'right' });
     doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
     
+    // Convert HTML content to text, preserving structure as much as possible
+    const cleanContent = cleanHtmlContent(template);
+    const lines = cleanContent.split('\n');
+    
+    let yPos = 40;
+    
+    // Process each line
     lines.forEach(line => {
       if (line.trim().length === 0) {
-        yPos += 10; // Empty line spacing
+        yPos += 6; // Empty line spacing
         return;
       }
       
-      // Check if line should be a header
-      if (line.toUpperCase() === line && line.trim().length > 10) {
+      // Check if line is all caps (likely a header)
+      if (line === line.toUpperCase() && line.trim().length > 3) {
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text(line, 20, yPos);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
+        yPos += 8;
       } else {
-        doc.text(line, 20, yPos);
+        // Split long lines to fit on the page
+        const splitText = doc.splitTextToSize(line, 170);
+        splitText.forEach((textLine: string) => {
+          doc.text(textLine, 20, yPos);
+          yPos += 7;
+        });
       }
-      
-      yPos += 10;
       
       // Add new page if needed
       if (yPos > 270) {

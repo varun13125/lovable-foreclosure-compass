@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -12,8 +11,19 @@ import { generateCaseDocument } from '@/utils/pdfGenerator';
 import { uploadDocument } from '@/services/documentService';
 import { useCase } from '@/hooks/useCase';
 import DocumentTypeSelect from './DocumentTypeSelect';
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Undo, Redo, Mail, Printer, Download, FileText } from 'lucide-react';
+import { 
+  Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  Undo, Redo, Mail, Printer, Download, FileText, Type, ListOrdered, 
+  List, Heading1, Heading2, Heading3, Indent, Outdent, Link, Image
+} from 'lucide-react';
 import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface DocumentEditorProps {
   selectedCase: Case | null;
@@ -27,6 +37,24 @@ interface Template {
   content: string;
 }
 
+interface FontOption {
+  name: string;
+  value: string;
+}
+
+const fontOptions: FontOption[] = [
+  { name: 'Arial', value: 'Arial, sans-serif' },
+  { name: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+  { name: 'Calibri', value: 'Calibri, sans-serif' },
+  { name: 'Georgia', value: 'Georgia, serif' },
+  { name: 'Verdana', value: 'Verdana, sans-serif' },
+  { name: 'Courier New', value: '"Courier New", Courier, monospace' },
+  { name: 'Tahoma', value: 'Tahoma, sans-serif' },
+  { name: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif' },
+];
+
+const fontSizes = ['8pt', '9pt', '10pt', '11pt', '12pt', '14pt', '16pt', '18pt', '20pt', '24pt', '28pt', '32pt', '36pt', '48pt', '72pt'];
+
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId }) => {
   const [documentType, setDocumentType] = useState<DocumentType>('Demand Letter');
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -38,6 +66,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
   const { currentCase } = useCase(selectedCase, caseId);
   const contentRef = useRef<HTMLDivElement>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
+  const [currentFont, setCurrentFont] = useState<string>(fontOptions[0].value);
+  const [currentFontSize, setCurrentFontSize] = useState<string>('12pt');
+  const [variableToInsert, setVariableToInsert] = useState<string>('');
   
   // Load templates from local storage
   useEffect(() => {
@@ -53,7 +84,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         setContent(matchingTemplate.content);
       } else {
         setSelectedTemplate(null);
+        // Set default content if no template is found
+        setContent('<p>Enter your document content here...</p>');
       }
+    } else {
+      // Set default content if no templates exist
+      setContent('<p>Enter your document content here...</p>');
     }
   }, [documentType]);
   
@@ -67,14 +103,24 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
           setDocumentTitle(`${documentType} - ${format(new Date(), 'yyyy-MM-dd')}`);
         }
       }
+    } else if (templates.length > 0 && !content) {
+      // Set default content if no template is selected
+      setContent('<p>Enter your document content here...</p>');
     }
   }, [selectedTemplate, templates, documentType]);
   
   // Generate preview content with case variables replaced
   useEffect(() => {
     if (currentCase && content) {
-      const processedContent = replaceTemplateVariables(content, currentCase);
-      setPreviewContent(processedContent);
+      try {
+        const processedContent = replaceTemplateVariables(content, currentCase);
+        setPreviewContent(processedContent);
+      } catch (error) {
+        console.error("Error processing template variables:", error);
+        setPreviewContent(content);
+      }
+    } else {
+      setPreviewContent(content);
     }
   }, [content, currentCase, activeTab]);
 
@@ -139,7 +185,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     // Replace all variables in the template
     let result = template;
     for (const [key, value] of Object.entries(replacements)) {
-      result = result.split(key).join(value);
+      // Use a regex with global flag to replace all occurrences
+      const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      result = result.replace(regex, value);
     }
     
     return result;
@@ -197,9 +245,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
           <head>
             <title>${documentTitle || documentType}</title>
             <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; }
-              h1, h2, h3 { margin-top: 20px; }
               @media print {
+                body { font-family: ${currentFont}; line-height: 1.6; margin: 20px; }
+                h1, h2, h3 { margin-top: 20px; }
                 button { display: none !important; }
               }
             </style>
@@ -255,6 +303,70 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
     // Prompt to download the document first
     handleDownload();
   };
+  
+  const insertVariable = (variable: string) => {
+    if (contentRef.current) {
+      // Get selection
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        // Insert the variable at cursor position
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+        span.className = 'bg-blue-100 rounded-md px-1 py-0.5 text-blue-800';
+        span.contentEditable = 'false';
+        span.textContent = variable;
+        range.deleteContents();
+        range.insertNode(span);
+        
+        // Move the cursor after the inserted variable
+        range.setStartAfter(span);
+        range.setEndAfter(span);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        // Update content
+        setContent(contentRef.current.innerHTML);
+      }
+    }
+  };
+
+  const handleSetFont = (font: string) => {
+    setCurrentFont(font);
+    document.execCommand('fontName', false, font);
+    if (contentRef.current) {
+      setContent(contentRef.current.innerHTML);
+    }
+  };
+
+  const handleSetFontSize = (size: string) => {
+    setCurrentFontSize(size);
+    // Convert pt size to HTML font size (approximate)
+    const fontSize = parseInt(size);
+    let htmlSize;
+    
+    if (fontSize <= 9) htmlSize = '1';
+    else if (fontSize <= 11) htmlSize = '2';
+    else if (fontSize <= 14) htmlSize = '3';
+    else if (fontSize <= 18) htmlSize = '4';
+    else if (fontSize <= 24) htmlSize = '5';
+    else if (fontSize <= 36) htmlSize = '6';
+    else htmlSize = '7';
+    
+    document.execCommand('fontSize', false, htmlSize);
+    
+    // Apply the exact size using style
+    const selection = document.getSelection();
+    if (selection && selection.rangeCount > 0 && selection.getRangeAt(0).commonAncestorContainer.parentNode) {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      range.surroundContents(span);
+    }
+    
+    if (contentRef.current) {
+      setContent(contentRef.current.innerHTML);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -271,14 +383,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             <DocumentTypeSelect value={documentType} onChange={setDocumentType} />
             
             <Select 
-              value={selectedTemplate?.toString() || "default"} 
-              onValueChange={(value) => setSelectedTemplate(value !== "default" ? parseInt(value) : null)}
+              value={selectedTemplate?.toString() || ""} 
+              onValueChange={(value) => setSelectedTemplate(value !== "" ? parseInt(value) : null)}
             >
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Select a template" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">Default Template</SelectItem>
+                <SelectItem value="">No Template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id.toString()}>
                     {template.name}
@@ -317,32 +429,254 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
         
         <TabsContent value="edit" className="border rounded-md p-4">
           <div className="mb-4 flex flex-wrap gap-1 border-b pb-2">
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('bold')}>
-              <Bold className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('italic')}>
-              <Italic className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('underline')}>
-              <Underline className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 mr-2">
+              <Select value={currentFont} onValueChange={handleSetFont}>
+                <SelectTrigger className="w-40 h-8">
+                  <Type className="h-3 w-3 mr-1" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fontOptions.map(font => (
+                    <SelectItem key={font.name} value={font.value}>
+                      <span style={{ fontFamily: font.value }}>{font.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={currentFontSize} onValueChange={handleSetFontSize}>
+                <SelectTrigger className="w-16 h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fontSizes.map(size => (
+                    <SelectItem key={size} value={size}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-0.5">
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('bold')} className="h-8 px-2">
+                <Bold className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('italic')} className="h-8 px-2">
+                <Italic className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('underline')} className="h-8 px-2">
+                <Underline className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            
             <div className="h-6 border-r mx-1"></div>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyLeft')}>
-              <AlignLeft className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyCenter')}>
-              <AlignCenter className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyRight')}>
-              <AlignRight className="h-4 w-4" />
-            </Button>
+            
+            <div className="flex items-center gap-0.5">
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyLeft')} className="h-8 px-2">
+                <AlignLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyCenter')} className="h-8 px-2">
+                <AlignCenter className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyRight')} className="h-8 px-2">
+                <AlignRight className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('justifyFull')} className="h-8 px-2">
+                <AlignJustify className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            
             <div className="h-6 border-r mx-1"></div>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('undo')}>
-              <Undo className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('redo')}>
-              <Redo className="h-4 w-4" />
-            </Button>
+            
+            <div className="flex items-center gap-0.5">
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('insertOrderedList')} className="h-8 px-2">
+                <ListOrdered className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('insertUnorderedList')} className="h-8 px-2">
+                <List className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            
+            <div className="h-6 border-r mx-1"></div>
+            
+            <div className="flex items-center gap-0.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" className="h-8 px-2">
+                    <Heading1 className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h1')}>
+                    <Heading1 className="h-3.5 w-3.5 mr-2" /> Heading 1
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h2')}>
+                    <Heading2 className="h-3.5 w-3.5 mr-2" /> Heading 2
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'h3')}>
+                    <Heading3 className="h-3.5 w-3.5 mr-2" /> Heading 3
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleTextFormatting('formatBlock', 'p')}>
+                    <Type className="h-3.5 w-3.5 mr-2" /> Paragraph
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('indent')} className="h-8 px-2">
+                <Indent className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('outdent')} className="h-8 px-2">
+                <Outdent className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            
+            <div className="h-6 border-r mx-1"></div>
+            
+            <div className="flex items-center gap-0.5">
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('undo')} className="h-8 px-2">
+                <Undo className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => handleTextFormatting('redo')} className="h-8 px-2">
+                <Redo className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            
+            <div className="h-6 border-r mx-1"></div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="ml-auto h-8">
+                  Insert Variable
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <Card>
+                  <div className="p-2 max-h-60 overflow-y-auto grid grid-cols-2 gap-1">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{date}')}
+                    >
+                      {'{date}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{property.address}')}
+                    >
+                      {'{property.address}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{mortgage.number}')}
+                    >
+                      {'{mortgage.number}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{mortgage.balance}')}
+                    >
+                      {'{mortgage.balance}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{mortgage.principal}')}
+                    >
+                      {'{mortgage.principal}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{mortgage.per_diem}')}
+                    >
+                      {'{mortgage.per_diem}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{mortgage.interest_rate}')}
+                    >
+                      {'{mortgage.interest_rate}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{case.file_number}')}
+                    >
+                      {'{case.file_number}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{lender.name}')}
+                    >
+                      {'{lender.name}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{borrower.name}')}
+                    >
+                      {'{borrower.name}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{borrower.email}')}
+                    >
+                      {'{borrower.email}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{borrower.phone}')}
+                    >
+                      {'{borrower.phone}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{court.file_number}')}
+                    >
+                      {'{court.file_number}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{court.registry}')}
+                    >
+                      {'{court.registry}'}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="justify-start text-left text-xs h-7"
+                      onClick={() => insertVariable('{court.hearing_date}')}
+                    >
+                      {'{court.hearing_date}'}
+                    </Button>
+                  </div>
+                </Card>
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div 
@@ -351,23 +685,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ selectedCase, caseId })
             contentEditable={true}
             onInput={(e) => setContent((e.target as HTMLDivElement).innerHTML)}
             dangerouslySetInnerHTML={{ __html: content }}
+            style={{ fontFamily: currentFont }}
           />
-          
-          <div className="mt-4 text-xs text-muted-foreground">
-            <p>Available variables:</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-2">
-              <span>{'{date}'}</span>
-              <span>{'{property.address}'}</span>
-              <span>{'{mortgage.number}'}</span>
-              <span>{'{mortgage.balance}'}</span>
-              <span>{'{mortgage.principal}'}</span>
-              <span>{'{mortgage.per_diem}'}</span>
-              <span>{'{mortgage.interest_rate}'}</span>
-              <span>{'{case.file_number}'}</span>
-              <span>{'{lender.name}'}</span>
-              <span>{'{borrower.name}'}</span>
-            </div>
-          </div>
         </TabsContent>
         
         <TabsContent value="preview" className="border rounded-md p-4">
