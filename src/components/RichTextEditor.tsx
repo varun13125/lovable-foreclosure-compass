@@ -22,15 +22,39 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     onChange(content);
   };
   
-  // Help maintain focus and cursor position
+  // Fix scroll jumping issue
   useEffect(() => {
-    // Prevent initial focus for better UX
-    const editor = quillRef.current?.getEditor();
-    if (editor && !readOnly) {
-      // Set tabindex to ensure it's keyboard accessible
-      const editorElement = editor.root;
-      if (editorElement) {
-        editorElement.setAttribute('tabindex', '0');
+    if (!readOnly) {
+      // Access the Quill editor instance
+      const editor = quillRef.current?.getEditor();
+      if (editor) {
+        // Get the editor element
+        const editorElement = editor.root;
+        if (editorElement) {
+          // Prevent scroll restoration behavior
+          editorElement.setAttribute('tabindex', '0');
+          
+          // Prevent scroll jumping by handling the focus events
+          const handleFocus = () => {
+            // Store current scroll position when focusing
+            const scrollPosition = window.scrollY;
+            
+            // Restore scroll position after a short delay
+            setTimeout(() => {
+              window.scrollTo({
+                top: scrollPosition,
+                behavior: 'auto'
+              });
+            }, 0);
+          };
+          
+          editorElement.addEventListener('focus', handleFocus);
+          
+          // Clean up the event listener
+          return () => {
+            editorElement.removeEventListener('focus', handleFocus);
+          };
+        }
       }
     }
   }, [readOnly]);

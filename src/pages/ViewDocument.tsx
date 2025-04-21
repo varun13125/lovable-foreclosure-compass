@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -16,6 +17,7 @@ export default function ViewDocument() {
   const [content, setContent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Fetch document on component mount
   useEffect(() => {
     if (id) {
       fetchDocument(id);

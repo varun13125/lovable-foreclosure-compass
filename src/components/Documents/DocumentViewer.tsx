@@ -232,25 +232,25 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
       
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
-            <div className="p-6">
-              {isEditing ? (
-                <div className="edit-container h-[60vh] w-full" style={{ position: 'relative' }}>
-                  <RichTextEditor
-                    value={documentContent}
-                    onChange={setDocumentContent}
-                    minHeight="60vh"
-                    className="h-full"
-                  />
-                </div>
-              ) : (
+          {isEditing ? (
+            <div className="w-full" style={{ height: "70vh" }}>
+              <RichTextEditor
+                value={documentContent}
+                onChange={setDocumentContent}
+                minHeight="70vh"
+                className="h-full"
+              />
+            </div>
+          ) : (
+            <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
+              <div className="p-6">
                 <div 
                   className="prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{ __html: documentContent }}
                 />
-              )}
-            </div>
-          </ScrollArea>
+              </div>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
     </div>
