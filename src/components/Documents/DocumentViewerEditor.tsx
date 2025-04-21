@@ -14,8 +14,9 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionStateRef = useRef<{ start: number; end: number; content: string } | null>(null);
   const [content, setContent] = useState(value);
+  const isUpdatingRef = useRef(false);
 
-  // Cursor Position Management
+  // Improved Cursor Position Management
   const CursorManager = {
     save: () => {
       if (!editorRef.current) return null;
@@ -37,6 +38,7 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
 
     restore: (savedSelection: { start: number; end: number; content: string } | null) => {
       if (!savedSelection || !editorRef.current) return;
+      if (isUpdatingRef.current) return; // Don't restore during updates
 
       const selection = window.getSelection();
       if (!selection) return;
@@ -51,7 +53,7 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
         if (foundStart && foundEnd) return;
 
         if (node.nodeType === Node.TEXT_NODE) {
-          const nextCharIndex = charIndex + node.textContent!.length;
+          const nextCharIndex = charIndex + (node.textContent?.length || 0);
           
           if (!foundStart && savedSelection.start >= charIndex && savedSelection.start <= nextCharIndex) {
             range.setStart(node, savedSelection.start - charIndex);
@@ -69,37 +71,54 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
         }
       };
 
-      traverseNodes(editorRef.current);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      try {
+        traverseNodes(editorRef.current);
+        
+        // Only set the selection if we found both start and end points
+        if (foundStart && foundEnd) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } catch (error) {
+        console.error("Error restoring selection:", error);
+      }
     }
   };
 
-  // Debounced content update
+  // Debounced content update with increased delay for better performance
   const debouncedOnChange = useCallback(
     debounce((newContent: string) => {
       onChange(newContent);
-    }, 300),
+    }, 500),
     [onChange]
   );
 
-  // Handle content changes
+  // Handle content changes with improved cursor management
   const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    const newContent = e.currentTarget.innerHTML;
+    // Save selection before any updates
     selectionStateRef.current = CursorManager.save();
+    
+    const newContent = e.currentTarget.innerHTML;
     setContent(newContent);
     debouncedOnChange(newContent);
   }, [debouncedOnChange]);
 
-  // Setup MutationObserver
+  // Enhanced MutationObserver setup with better event handling
   useEffect(() => {
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach(() => {
+      if (isUpdatingRef.current) return;
+      
+      const hasContentChanged = mutations.some(mutation => 
+        mutation.type === 'characterData' || 
+        mutation.type === 'childList'
+      );
+      
+      if (hasContentChanged) {
         const cursorPosition = CursorManager.save();
         if (cursorPosition) {
           selectionStateRef.current = cursorPosition;
         }
-      });
+      }
     });
 
     if (editorRef.current) {
@@ -114,42 +133,79 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Restore cursor position after render
+  // Restore cursor position after render with improved timing
   useEffect(() => {
     if (selectionStateRef.current) {
-      requestAnimationFrame(() => {
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      const restoreFrame = requestAnimationFrame(() => {
+        isUpdatingRef.current = true;
         CursorManager.restore(selectionStateRef.current);
+        isUpdatingRef.current = false;
       });
+      
+      return () => cancelAnimationFrame(restoreFrame);
     }
   }, [content]);
 
-  // Set initial content
+  // Set initial content with content containment to prevent layout shifts
   useEffect(() => {
     if (value !== content && editorRef.current) {
+      isUpdatingRef.current = true;
       editorRef.current.innerHTML = value;
       setContent(value);
+      isUpdatingRef.current = false;
     }
   }, [value]);
 
-  // Handle special key events
+  // Enhanced key event handling with better modifier key support
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       document.execCommand('insertLineBreak');
+      
+      // Save cursor position after enter key
+      setTimeout(() => {
+        selectionStateRef.current = CursorManager.save();
+      }, 0);
+      
       return false;
     }
     return true;
   }, []);
 
+  // Prevent focus loss which can cause cursor jumping
+  const handleBlur = useCallback((e: React.FocusEvent) => {
+    // Only if the related target is outside our editor
+    if (editorRef.current && !editorRef.current.contains(e.relatedTarget as Node)) {
+      selectionStateRef.current = CursorManager.save();
+    }
+  }, []);
+
   return (
-    <div className="fixed-height-container" style={{ height: "70vh", overflow: "hidden", position: "relative" }}>
-      <div className="editor-container" style={{ height: "100%", position: "relative" }}>
+    <div 
+      className="fixed-height-container" 
+      style={{ 
+        height: "70vh", 
+        overflow: "hidden", 
+        position: "relative",
+        contain: "content" // CSS containment to prevent layout shifts
+      }}
+    >
+      <div 
+        className="editor-container" 
+        style={{ 
+          height: "100%", 
+          position: "relative",
+          contain: "content"
+        }}
+      >
         <div
           ref={editorRef}
           className="document-editor"
           contentEditable={true}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
           dangerouslySetInnerHTML={{ __html: content }}
           suppressContentEditableWarning={true}
           style={{
@@ -159,11 +215,14 @@ const DocumentViewerEditor: React.FC<DocumentViewerEditorProps> = ({
             outline: "none",
             overflowY: "auto",
             lineHeight: "1.5",
-            fontFamily: "inherit"
+            fontFamily: "inherit",
+            contain: "content", // CSS containment for better performance
+            position: "relative" // Helps with positioning calculations
           }}
           role="textbox"
           aria-multiline="true"
           aria-label="Document editor"
+          data-gramm="false" // Prevent Grammarly from interfering
         />
       </div>
     </div>
