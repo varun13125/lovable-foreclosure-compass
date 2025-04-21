@@ -1,14 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { Document } from '@/types';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Download, Printer, Check } from 'lucide-react';
 import { format } from 'date-fns';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { generateCaseDocument } from '@/utils/pdfGenerator';
-import RichTextEditor from '@/components/RichTextEditor';
+import DocumentViewerHeader from './DocumentViewerHeader';
+import DocumentViewerEditor from './DocumentViewerEditor';
+import DocumentViewerDisplay from './DocumentViewerDisplay';
 
 interface DocumentViewerProps {
   document: Document;
@@ -168,87 +168,33 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">{document.title || document.type}</h2>
-          <p className="text-muted-foreground">
-            Created: {format(new Date(document.createdAt), 'MMMM d, yyyy')}
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {isEditing ? (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsEditing(false);
-                  setDocumentContent(content || '');
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSave} 
-                disabled={saving}
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-                disabled={document.status === 'Finalized'}
-              >
-                Edit
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleDownload}
-              >
-                <Download className="mr-2 h-4 w-4" /> Download
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handlePrint}
-              >
-                <Printer className="mr-2 h-4 w-4" /> Print
-              </Button>
-              {document.status !== 'Finalized' && (
-                <Button 
-                  onClick={handleFinalizeDocument}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Check className="mr-2 h-4 w-4" /> Finalize
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      
+      <DocumentViewerHeader
+        title={document.title}
+        type={document.type}
+        createdAt={format(new Date(document.createdAt), 'MMMM d, yyyy')}
+        status={document.status}
+        isEditing={isEditing}
+        saving={saving}
+        onEdit={() => setIsEditing(true)}
+        onCancelEdit={() => {
+          setIsEditing(false);
+          setDocumentContent(content || '');
+        }}
+        onSave={handleSave}
+        onDownload={handleDownload}
+        onPrint={handlePrint}
+        onFinalize={handleFinalizeDocument}
+        canFinalize={document.status !== 'Finalized'}
+      />
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           {isEditing ? (
-            <div className="fixed-height-container" style={{ height: "70vh", overflow: "hidden", position: "relative" }}>
-              <RichTextEditor
-                value={documentContent}
-                onChange={setDocumentContent}
-                minHeight="70vh"
-              />
-            </div>
+            <DocumentViewerEditor
+              value={documentContent}
+              onChange={setDocumentContent}
+            />
           ) : (
-            <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
-              <div className="p-6">
-                <div 
-                  className="prose prose-sm max-w-none dark:prose-invert"
-                  dangerouslySetInnerHTML={{ __html: documentContent }}
-                />
-              </div>
-            </ScrollArea>
+            <DocumentViewerDisplay content={documentContent} />
           )}
         </CardContent>
       </Card>
