@@ -233,12 +233,11 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           {isEditing ? (
-            <div className="editor-container" style={{ height: "70vh" }}>
+            <div className="fixed-height-container" style={{ height: "70vh", overflow: "hidden", position: "relative" }}>
               <RichTextEditor
                 value={documentContent}
                 onChange={setDocumentContent}
                 minHeight="70vh"
-                className="h-full"
               />
             </div>
           ) : (
