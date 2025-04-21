@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Document } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -91,7 +90,6 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const handleDownload = () => {
     try {
-      // Create a mock case object for the PDF generator
       const mockCase = {
         fileNumber: document.caseNumber || 'Unknown',
         id: document.caseId || 'unknown',
@@ -237,11 +235,12 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
           <ScrollArea className="h-[70vh] w-full bg-gray-50 dark:bg-gray-900/20">
             <div className="p-6">
               {isEditing ? (
-                <div className="edit-container" style={{ height: "60vh" }}>
+                <div className="edit-container h-[60vh] w-full" style={{ position: 'relative' }}>
                   <RichTextEditor
                     value={documentContent}
                     onChange={setDocumentContent}
                     minHeight="60vh"
+                    className="h-full"
                   />
                 </div>
               ) : (
